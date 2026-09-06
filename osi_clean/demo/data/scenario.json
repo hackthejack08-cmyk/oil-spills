@@ -1,0 +1,10 @@
+{
+  "synthetic": true,
+  "t_obs": "2025-03-14T01:12:00+00:00",
+  "t_spill_start": "2025-03-13T21:02:00+00:00",
+  "origin_lon": 70.55,
+  "origin_lat": 19.35,
+  "culprit_mmsi": 419000101,
+  "true_age_hours": 4.17,
+  "description": "Synthetic Arabian Sea discharge scenario for SIH26143 offline demo"
+}

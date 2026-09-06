@@ -1,0 +1,17 @@
+services:
+  osi:
+    build: { context: ., dockerfile: docker/Dockerfile }
+    ports: ["8000:8000"]
+    volumes:
+      - ./backend/models:/srv/models      # drop unet_s1_oil.pt here to switch from baseline to CNN
+      - osi_runtime:/srv/runtime
+    env_file: [ { path: .env, required: false } ]   # credentials for optional connectors, see .env.example
+    environment:
+      - OSI_SEG_THRESHOLD=0.5
+      - OSI_DRIFT_ENGINE=builtin
+      - OSI_CDSE_USER=${OSI_CDSE_USER:-}
+      - OSI_CDSE_PASSWORD=${OSI_CDSE_PASSWORD:-}
+      - OSI_CMEMS_USER=${OSI_CMEMS_USER:-}
+      - OSI_CMEMS_PASSWORD=${OSI_CMEMS_PASSWORD:-}
+      - OSI_AISSTREAM_KEY=${OSI_AISSTREAM_KEY:-}
+volumes: { osi_runtime: {} }

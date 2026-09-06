@@ -1,0 +1,12 @@
+backend/runtime/
+backend/models/*.pt
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+.env
+*.egg-info/
+backend/runtime/eval/chips/
+backend/runtime/eval/*.dbf
+backend/runtime/eval/*.shp
+backend/runtime/eval/*.shx
