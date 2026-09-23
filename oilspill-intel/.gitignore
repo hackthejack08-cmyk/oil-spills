@@ -1,5 +1,8 @@
 backend/runtime/
 backend/models/*.pt
+backend/models/*.pth
+demo/samples/globalosd_diverse20/*.tif
+demo/samples/arabian_sea_variant_02/*.tif
 __pycache__/
 *.pyc
 .pytest_cache/
@@ -10,3 +13,4 @@ backend/runtime/eval/chips/
 backend/runtime/eval/*.dbf
 backend/runtime/eval/*.shp
 backend/runtime/eval/*.shx
+.vercel

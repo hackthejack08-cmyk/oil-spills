@@ -40,7 +40,7 @@ def status():
         {"id": "planetary", "name": "Sentinel-1 GRD – Microsoft Planetary Computer (STAC + COG)", "ready": True, "account": "none, no quota", "note": "default: search + AOI streaming + σ⁰ calibration, ~15–60 s per AOI"},
         {"id": "cdse_search", "name": "Sentinel-1 catalogue (CDSE OData)", "ready": True, "account": "none", "note": "public search (fallback provider)"},
         {"id": "cdse_download", "name": "Sentinel-1 GRD download + σ⁰ calibration", "ready": cdse_dl, "account": "free CDSE account (dataspace.copernicus.eu); monthly quota", "note": "set OSI_CDSE_USER/OSI_CDSE_PASSWORD; ~1 GB per scene"},
-        {"id": "hycom", "name": "Ocean currents – HYCOM GOFS/ESPC (OPeNDAP)", "ready": True, "account": "none", "note": "2018-12 → today + 8-day forecast, 1/12°, 3-hourly"},
+        {"id": "hycom", "name": "Ocean currents – HYCOM GOFS/ESPC (NCSS)", "ready": True, "account": "none", "note": "NetCDF subset service; 2018-12 → today + 8-day forecast, 1/12°, 3-hourly"},
         {"id": "cmems", "name": "Ocean currents – Copernicus Marine (optional)", "ready": cmems, "account": "free CMEMS account", "note": "set OSI_CMEMS_USER/OSI_CMEMS_PASSWORD; needs `copernicusmarine`"},
         {"id": "open_meteo", "name": "10 m wind – Open-Meteo ERA5 archive", "ready": True, "account": "none (CC BY 4.0, non-commercial free tier)", "note": "0.25°, hourly, 1940 →"},
         {"id": "marinecadastre", "name": "Historical AIS – NOAA MarineCadastre", "ready": True, "account": "none (CC0)", "note": "US waters; 2009–2023 direct daily zips verified; newer years via AccessAIS export"},

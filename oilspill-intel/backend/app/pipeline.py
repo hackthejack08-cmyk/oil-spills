@@ -12,6 +12,8 @@ from typing import Optional
 
 import numpy as np
 import pandas as pd
+import rasterio
+from rasterio.warp import transform_bounds
 from PIL import Image
 
 from . import config, db
@@ -57,8 +59,8 @@ def analyze_scene(inv_id: str, scene_path: str, sensing_time: Optional[str] = No
         land |= scene.land
     slicks = geom.extract(mask, prob, scene.db[0], scene.transform, scene.crs, land_mask=land, shore_km=shore)
     scene_id, run_id = _uid("scn"), _uid("run")
-    b = scene.transform * (0, 0), scene.transform * (scene.shape[1], scene.shape[0])
-    minlon, maxlat = b[0]; maxlon, minlat = b[1]
+    left, bottom, right, top = rasterio.transform.array_bounds(*scene.shape, scene.transform)
+    minlon, minlat, maxlon, maxlat = transform_bounds(scene.crs, "EPSG:4326", left, bottom, right, top, densify_pts=21)
     # quicklook PNG for the UI (VV dB stretched) + probability overlay
     ql = preprocess.normalise(scene.db[:1])[0]
     step = max(1, scene.shape[0] // 1024)
@@ -94,12 +96,16 @@ def analyze_scene(inv_id: str, scene_path: str, sensing_time: Optional[str] = No
             detections.append(d)
         c.execute("UPDATE investigations SET status='scene_analyzed' WHERE id=?", (inv_id,))
     out = {"scene_id": scene_id, "model_run_id": run_id, "detector": detector, "sensing_time": sensing,
+           "synthetic": scene.meta.get("synthetic", "false") == "true",
            "bbox": [minlon, minlat, maxlon, maxlat], "quicklook": f"/renders/{scene_id}_vv.png",
            "prob_overlay": f"/renders/{scene_id}_prob.png", "detections": detections,
            "processing_s": round(time.time() - t0, 2),
            "age_estimate": {"status": "unavailable", "reason": "Spill age is not observable from a single SAR scene; "
                             "hindcast is run over a 1–%d h age window instead." % config.DRIFT_MAX_HOURS}}
-    _CACHE.setdefault(inv_id, {})["scene"] = out
+    # ponytail: response snapshots fit laptop cases; use object storage for large multi-user runs.
+    with db.conn() as c:
+        db.add_evidence(c, inv_id, "scene_result", scene_id, out, _uid("ev"))
+    _CACHE[inv_id] = {"scene": out}
     return out
 
 
@@ -126,9 +132,9 @@ def hindcast(inv_id: str, detection_id: str, forcing_path: str, hours: int = con
     fwd = drift.simulate(forcing, pts[:, 0], pts[:, 1], t_obs, forward_hours, backward=False) if forward_hours else None
     wind = forcing.wind_at(t_obs, g["centroid_lon"], g["centroid_lat"])
     run_id = _uid("drf")
-    result = {"drift_run_id": run_id, "t_obs": t_obs.isoformat(), "backward": {"hypotheses": back.hypotheses, "centre_track": back.centre_track},
+    result = {"drift_run_id": run_id, "detection_id": detection_id, "t_obs": t_obs.isoformat(), "backward": {"hypotheses": back.hypotheses, "centre_track": back.centre_track},
               "forward": None if fwd is None else {"hypotheses": fwd.hypotheses, "centre_track": fwd.centre_track},
-              "params": back.params, "wind_at_slick_ms": round(wind, 2),
+              "params": back.params, "forcing_source": forcing.source, "wind_at_slick_ms": round(wind, 2),
               "origin_window": {"earliest": (t_obs - timedelta(hours=hours)).isoformat(), "latest": (t_obs - timedelta(hours=1)).isoformat(),
                                 "note": "Release time is unobservable from one scene; every hour in this window is a hypothesis with its own uncertainty ellipse."}}
     with db.conn() as c:
@@ -138,8 +144,10 @@ def hindcast(inv_id: str, detection_id: str, forcing_path: str, hours: int = con
             c.execute("INSERT INTO origin_estimates VALUES (?,?,?,?,?,?,?,?,?)", (_uid("org"), run_id, h["age_hours"], h["time"],
                       h["centre"][0], h["centre"][1], json.dumps(h["ellipse50"]), json.dumps(h["ellipse90"]), h["spread_km"]))
         db.add_evidence(c, inv_id, "drift", run_id, {k: v for k, v in result.items() if k != "backward"} | {"n_hypotheses": len(back.hypotheses)}, _uid("ev"))
+        db.add_evidence(c, inv_id, "drift_result", run_id, result, _uid("ev"))
         c.execute("UPDATE investigations SET status='hindcast_done' WHERE id=?", (inv_id,))
-    _CACHE.setdefault(inv_id, {}).update({"hypotheses": back.hypotheses, "t_obs": t_obs, "wind": wind,
+    _CACHE.setdefault(inv_id, {}).pop("ais", None)
+    _CACHE[inv_id].update({"drift_run_id": run_id, "hypotheses": back.hypotheses, "t_obs": t_obs, "wind": wind,
                                           "slick": (g["centroid_lon"], g["centroid_lat"], g["orientation_deg"]), "detection_id": detection_id})
     return result
 
@@ -152,13 +160,15 @@ def _restore_ctx(inv_id: str) -> dict:
     with db.conn() as c:
         row = c.execute("SELECT dr.id, dr.detection_id, g.centroid_lon, g.centroid_lat, g.orientation_deg, s.sensing_time "
                         "FROM drift_runs dr JOIN spill_detections d ON d.id=dr.detection_id JOIN spill_geometries g ON g.detection_id=d.id "
-                        "JOIN satellite_scenes s ON s.id=d.scene_id WHERE s.investigation_id=? ORDER BY dr.created_at DESC LIMIT 1", (inv_id,)).fetchone()
+                        "JOIN satellite_scenes s ON s.id=d.scene_id WHERE s.investigation_id=? "
+                        "AND s.id=(SELECT id FROM satellite_scenes WHERE investigation_id=? ORDER BY rowid DESC LIMIT 1) "
+                        "ORDER BY dr.rowid DESC LIMIT 1", (inv_id, inv_id)).fetchone()
         if row is None:
             return ctx
         hyps = [dict(age_hours=r["age_hours"], time=r["time_utc"], centre=[r["lon"], r["lat"]], ellipse50=json.loads(r["ellipse50"]),
                      ellipse90=json.loads(r["ellipse90"]), spread_km=r["spread_km"], particles=json.loads(r["ellipse50"])["coordinates"][0])
                 for r in c.execute("SELECT * FROM origin_estimates WHERE drift_run_id=? ORDER BY age_hours", (row["id"],))]
-    ctx.update({"hypotheses": hyps, "t_obs": _parse_time(row["sensing_time"]), "detection_id": row["detection_id"],
+    ctx.update({"drift_run_id": row["id"], "hypotheses": hyps, "t_obs": _parse_time(row["sensing_time"]), "detection_id": row["detection_id"],
                 "slick": (row["centroid_lon"], row["centroid_lat"], row["orientation_deg"])})
     return ctx
 
@@ -210,6 +220,9 @@ def analyze_ais(inv_id: str, ais_path: str, radius_km: float = config.AIS_SEARCH
            "window": [window[0].isoformat(), window[1].isoformat()], "synthetic": bool(synthetic),
            "candidates": [c.dict() | {"rank": i} for i, c in enumerate(cands, 1)], "tracks": all_tracks,
            "disclaimer": "Correlation scores express consistency with the available evidence. They are NOT proof of responsibility."}
+    out.update({"drift_run_id": ctx.get("drift_run_id"), "detection_id": ctx["detection_id"]})
+    with db.conn() as c:
+        db.add_evidence(c, inv_id, "ais_result", ctx["detection_id"], out, _uid("ev"))
     ctx["ais"] = out
     return out
 
@@ -229,8 +242,32 @@ def get_investigation(inv_id: str) -> dict:
     with db.conn() as c:
         scenes = [{"id": r["id"], "sensing_time": r["sensing_time"], "bbox": [r["minlon"], r["minlat"], r["maxlon"], r["maxlat"]]}
                   for r in c.execute("SELECT * FROM satellite_scenes WHERE investigation_id=? ORDER BY rowid DESC", (inv_id,))]
+    with db.conn() as c:
+        def latest(kind):
+            row = c.execute("SELECT payload FROM evidence WHERE investigation_id=? AND kind=? ORDER BY rowid DESC LIMIT 1",
+                            (inv_id, kind)).fetchone()
+            return json.loads(row[0]) if row else None
+        scene = latest("scene_result") or ctx.get("scene")
+        # Legacy cases have detection evidence but no saved scene response.
+        if scene is None and scenes:
+            sc = scenes[0]
+            ids = {d["id"] for d in dets if d["scene_id"] == sc["id"]}
+            detections = [json.loads(r[0]) for r in c.execute(
+                "SELECT payload FROM evidence WHERE investigation_id=? AND kind='detection' ORDER BY rowid", (inv_id,))
+                if json.loads(r[0])["id"] in ids]
+            model = c.execute("SELECT detector, duration_s FROM model_runs WHERE scene_id=? ORDER BY rowid DESC LIMIT 1", (sc["id"],)).fetchone()
+            scene = {"scene_id": sc["id"], "sensing_time": sc["sensing_time"], "bbox": sc["bbox"],
+                     "quicklook": f"/renders/{sc['id']}_vv.png", "prob_overlay": f"/renders/{sc['id']}_prob.png",
+                     "detections": detections, "detector": model[0] if model else "unknown", "processing_s": model[1] if model else None,
+                     "age_estimate": {"status": "unavailable", "reason": "Age is not observable from one SAR image."}}
+        dr = latest("drift_result")
+        if dr and (not scene or dr["detection_id"] not in {d["id"] for d in scene["detections"]}):
+            dr = None
+        ais = latest("ais_result")
+        if ais and (not dr or ais.get("drift_run_id") != dr["drift_run_id"]):
+            ais = None
     return {"investigation": dict(inv), "scenes": scenes, "detections": dets, "top_candidates": cors, "n_evidence": ev,
-            "scene": ctx.get("scene"), "has_drift": "hypotheses" in ctx, "has_ais": "ais" in ctx}
+            "scene": scene, "drift": dr, "ais": ais, "has_drift": dr is not None, "has_ais": ais is not None}
 
 
 def scene_context(inv_id: str) -> dict:

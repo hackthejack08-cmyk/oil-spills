@@ -1,0 +1,21 @@
+{
+ "tag": "diverse20_baseline",
+ "n_pos": 10,
+ "n_neg": 9,
+ "skipped": 1,
+ "hit_km": 8.0,
+ "factor": 8,
+ "half_deg": 0.08,
+ "detector": "baseline-adaptive-threshold",
+ "generated": "2026-09-07T15:23:04.573329+00:00",
+ "detection_rate@0.35": 0.9,
+ "false_alarm_rate@0.35": 0.667,
+ "detection_rate@0.5": 0.8,
+ "false_alarm_rate@0.5": 0.444,
+ "detection_rate@0.6": 0.6,
+ "false_alarm_rate@0.6": 0.444,
+ "any_dark_object_rate_pos": 0.9,
+ "any_dark_object_rate_neg": 0.778,
+ "auc_oil_likelihood": 0.622,
+ "auc_seg_only": 0.744
+}

@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import re
 from datetime import datetime, timezone
 import shutil
 import uuid
@@ -17,8 +19,9 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import config, db, pipeline
+from . import config, db, jobs, pipeline
 from .api.data_sources import router as data_router
+from .integrations import metocean
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("osi")
@@ -76,9 +79,96 @@ def _resolve(kind: str, ref: str) -> Path:
     return p
 
 
+async def _save_upload(kind: str, file: UploadFile) -> tuple[str, Path, int, str]:
+    """Store one trusted upload and return its id, path, size and digest."""
+    suffix = Path(file.filename or "").suffix.lower()
+    expected = {"scene": ALLOWED_SUFFIX, "ais": {".csv"}, "forcing": {".nc"}}
+    if suffix not in expected.get(kind, set()):
+        labels = {"scene": "a GeoTIFF (.tif/.tiff)", "ais": "a CSV", "forcing": "a NetCDF (.nc)"}
+        raise HTTPException(400, f"{kind} input must be {labels.get(kind, 'a supported file')}")
+    uid = uuid.uuid4().hex
+    dest = config.DATA_DIR / "uploads" / f"{uid}{suffix}"
+    size = 0
+    try:
+        with dest.open("wb") as output:
+            while chunk := await file.read(1 << 20):
+                size += len(chunk)
+                if size > MAX_UPLOAD_MB << 20:
+                    raise HTTPException(413, f"file exceeds the {MAX_UPLOAD_MB} MB limit")
+                output.write(chunk)
+        if kind == "scene":
+            with dest.open("rb") as source:
+                if source.read(4) not in (b"II*\x00", b"MM\x00*", b"II+\x00", b"MM\x00+"):
+                    raise HTTPException(400, "the selected file is not a TIFF")
+        return uid, dest, size, db.sha256_file(dest)
+    except Exception:
+        dest.unlink(missing_ok=True)
+        raise
+
+
+def _scene_time(path: Path, original_name: str) -> str:
+    """Read capture time from GeoTIFF metadata, then from a YYYYMMDD filename."""
+    import rasterio
+
+    with rasterio.open(path) as scene:
+        if scene.crs is None:
+            raise ValueError("the GeoTIFF has no CRS; export it with geographic coordinates")
+        if scene.transform.is_identity:
+            raise ValueError("the GeoTIFF has no georeferencing transform")
+        sensing = scene.tags().get("sensing_time") or scene.tags().get("datetime")
+    if sensing:
+        captured = datetime.fromisoformat(sensing.replace("Z", "+00:00"))
+        return (captured if captured.tzinfo else captured.replace(tzinfo=timezone.utc)).isoformat()
+    match = re.search(r"(?<!\d)(20\d{6})(?!\d)", original_name)
+    if match:
+        return datetime.strptime(match.group(1), "%Y%m%d").replace(tzinfo=timezone.utc).isoformat()
+    raise ValueError("capture time is missing; add a 'sensing_time' GeoTIFF tag or YYYYMMDD to the filename")
+
+
+def _run_image_case(path: Path, original_name: str, sensing_time: str, progress) -> dict:
+    """Run every available stage from one SAR image; never invent unavailable AIS."""
+    warnings: list[str] = []
+    progress(1, 5, "detecting and measuring suspected slicks")
+    inv = pipeline.create_investigation(f"Image analysis – {Path(original_name).stem[:70]}", "real", "single-image workflow")
+    scene = pipeline.analyze_scene(inv["id"], str(path), sensing_time=sensing_time)
+    result = {"investigation": inv, "scene": scene, "detection_id": None, "drift": None, "ais": None,
+              "completed_stage": "detection", "warnings": warnings}
+    if not scene["detections"]:
+        warnings.append("No suspected slick passed the detector threshold; drift and vessel matching were not run.")
+        return result
+    detection = max(scene["detections"], key=lambda item: item["oil_likelihood"])
+    result["detection_id"] = detection["id"]
+
+    is_bundled_scene = db.sha256_file(path) == db.sha256_file(config.DEMO_DIR / "synthetic_s1_scene.tif")
+    forcing_path = config.DEMO_DIR / "synthetic_forcing.nc" if is_bundled_scene else config.DATA_DIR / "uploads" / f"{uuid.uuid4().hex}.nc"
+    if not is_bundled_scene:
+        progress(2, 5, "fetching ocean currents and wind")
+        try:
+            pad = [scene["bbox"][0] - 1, scene["bbox"][1] - 1, scene["bbox"][2] + 1, scene["bbox"][3] + 1]
+            metocean.build_forcing(pad, pipeline._parse_time(sensing_time), config.DRIFT_MAX_HOURS + 3, 9, forcing_path)
+        except Exception as exc:
+            warnings.append(f"Environmental forcing unavailable: {type(exc).__name__}: {exc}")
+            return result
+
+    progress(3, 5, "reconstructing probable origin and forecast")
+    drift = pipeline.hindcast(inv["id"], detection["id"], str(forcing_path), config.DRIFT_MAX_HOURS, 6)
+    result.update({"drift": drift, "completed_stage": "drift"})
+
+    ais_path = config.DEMO_DIR / "synthetic_ais.csv" if is_bundled_scene else Path(os.getenv("OSI_DEFAULT_AIS_CSV", ""))
+    if not is_bundled_scene and (not str(ais_path) or not ais_path.is_file()):
+        warnings.append("Historical AIS is not configured for this deployment. Add OSI_DEFAULT_AIS_CSV or an authorized AIS provider to enable vessel ranking.")
+        return result
+    progress(4, 5, "reconstructing vessel tracks and ranking evidence")
+    ais = pipeline.analyze_ais(inv["id"], str(ais_path))
+    result.update({"ais": ais, "completed_stage": "complete"})
+    progress(5, 5, "investigation complete")
+    return result
+
+
 @app.get("/api/health")
 def health():
     return {"status": "ok", "demo_data": (config.DEMO_DIR / "synthetic_s1_scene.tif").exists(),
+            "land_mask_available": (config.DEMO_DIR / "ne_10m_land.geojson").exists(),
             "cnn_weights": config.SEG_WEIGHTS.exists(), "drift_engine": config.DRIFT_ENGINE,
             "db": str(config.DB_PATH), "offline": True}
 
@@ -135,30 +225,27 @@ def list_uploads():
 
 @app.post("/api/satellite/upload")
 async def upload(kind: str = Form(...), file: UploadFile = File(...)):
-    suffix = Path(file.filename or "").suffix.lower()
-    if kind == "scene" and suffix not in ALLOWED_SUFFIX:
-        raise HTTPException(400, "only GeoTIFF scenes are accepted")
-    if kind == "ais" and suffix != ".csv":
-        raise HTTPException(400, "AIS must be CSV")
-    if kind == "forcing" and suffix != ".nc":
-        raise HTTPException(400, "forcing must be NetCDF")
-    uid = uuid.uuid4().hex
-    dest = config.DATA_DIR / "uploads" / f"{uid}{suffix}"
-    size = 0
-    with dest.open("wb") as f:
-        while chunk := await file.read(1 << 20):
-            size += len(chunk)
-            if size > MAX_UPLOAD_MB << 20:
-                dest.unlink(missing_ok=True)
-                raise HTTPException(413, "file too large")
-            f.write(chunk)
-    # magic-byte check for GeoTIFF
-    if kind == "scene":
-        with dest.open("rb") as f:
-            magic = f.read(4)
-        if magic not in (b"II*\x00", b"MM\x00*", b"II+\x00", b"MM\x00+"):
-            dest.unlink(); raise HTTPException(400, "not a TIFF file")
-    return {"upload_id": uid, "bytes": size, "sha256": db.sha256_file(dest)}
+    uid, _, size, digest = await _save_upload(kind, file)
+    return {"upload_id": uid, "bytes": size, "sha256": digest}
+
+
+@app.post("/api/auto/run")
+async def auto_run(file: UploadFile = File(...)):
+    """Queue the simple one-image workflow and return immediately."""
+    uid, path, size, digest = await _save_upload("scene", file)
+    original_name = file.filename or path.name
+    try:
+        sensing_time = _scene_time(path, original_name)
+    except Exception as exc:
+        path.unlink(missing_ok=True)
+        raise HTTPException(422, f"Cannot use this image automatically: {exc}")
+
+    def run(progress):
+        return _run_image_case(path, original_name, sensing_time, progress)
+
+    job = jobs.submit("image_investigation", run)
+    return {"job_id": job["id"], "upload_id": uid, "bytes": size, "sha256": digest,
+            "sensing_time": sensing_time}
 
 
 @app.post("/api/satellite/analyze")
@@ -242,6 +329,32 @@ def evidence(inv_id: str):
 def scenario():
     p = config.DEMO_DIR / "scenario.json"
     return json.loads(p.read_text()) if p.exists() else {"synthetic": True}
+
+
+@app.get("/api/demo/sample-scene")
+def download_sample_scene():
+    """Download the same synthetic GeoTIFF used by the verified demo."""
+    path = config.DEMO_DIR / "synthetic_s1_scene.tif"
+    if not path.exists():
+        raise HTTPException(404, "sample scene is not installed")
+    return FileResponse(
+        path,
+        media_type="image/tiff",
+        filename="OSI_sample_20250314.tif",
+        headers={"X-OSI-Data-Type": "synthetic"},
+    )
+
+
+@app.get("/api/evidence/{inv_id}/export")
+def export_evidence(inv_id: str):
+    with db.conn() as c:
+        inv = c.execute("SELECT * FROM investigations WHERE id=?", (inv_id,)).fetchone()
+    if inv is None:
+        raise HTTPException(404, "investigation not found")
+    return JSONResponse({"investigation": dict(inv), "exported_at": db.now(),
+                         "disclaimer": "Research prototype. Scores are uncalibrated evidence matches, not proof of responsibility. Evidence may include previous runs.",
+                         **evidence(inv_id)},
+                        headers={"Content-Disposition": f'attachment; filename="{inv_id}-evidence.json"'})
 
 
 @app.get("/api/demo/coastline")

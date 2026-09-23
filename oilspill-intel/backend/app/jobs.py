@@ -41,7 +41,7 @@ def submit(kind: str, fn: Callable, *args, **kwargs) -> dict:
         job["status"] = "running"
         try:
             job["result"] = fn(*args, progress=progress, **kwargs)
-            job["status"] = "done"; job["progress"] = 1.0
+            job["status"] = "done"; job["progress"] = 1.0; job["message"] = "complete"
         except Exception as exc:  # noqa
             job["status"] = "error"; job["error"] = f"{type(exc).__name__}: {exc}"; job["trace"] = traceback.format_exc()[-2000:]
         job["finished_at"] = datetime.now(timezone.utc).isoformat()

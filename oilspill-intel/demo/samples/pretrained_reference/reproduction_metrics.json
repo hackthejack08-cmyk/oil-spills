@@ -1,0 +1,13 @@
+{
+  "purpose": "checkpoint/interface reproduction only; reference masks are not independent ground truth",
+  "micro_oil_iou": 0.7425,
+  "oil_precision": 0.9552,
+  "oil_recall": 0.7692,
+  "cases": {
+    "dht_edelweiss_pass": {"pixel_agreement": 0.9940, "oil_iou": 0.8550},
+    "kota_suria_pass": {"pixel_agreement": 0.9987, "oil_iou": 0.8863},
+    "palona_pass": {"pixel_agreement": 0.9988, "oil_iou": 0.0, "note": "no oil pixels in either mask"},
+    "very_maria_pass": {"pixel_agreement": 0.9263, "oil_iou": 0.2352},
+    "wakashio_reef": {"pixel_agreement": 0.9801, "oil_iou": 0.7273}
+  }
+}

@@ -1,0 +1,17 @@
+.git
+.github
+.venv
+.env
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+backend/runtime
+backend/models
+backend/tests
+backend/training
+demo/samples
+docs
+public-demo
+tools
+*.pptx
+*.pdf

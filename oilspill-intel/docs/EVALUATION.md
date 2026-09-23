@@ -3,6 +3,8 @@
 _Last run: 2026-09-05. Every number below was produced by code in this repository on real Sentinel-1 GRD data
 streamed from Microsoft Planetary Computer (no account). Nothing is copied from papers._
 
+_Additional independent rerun: 2026-09-07. See §7 for the newly packaged geographically diverse sample._
+
 ## 1. What was evaluated
 
 | Component | Data | Method |
@@ -94,3 +96,23 @@ mkdir -p runtime/eval && cd runtime/eval && for f in positives negatives; do for
 python training/benchmark_globalosd.py --n 25 --seed 1 --subcat Ships
 python training/benchmark_globalosd.py --n 25 --seed 2 --subcat Platforms
 ```
+
+## 7. Packaged diverse rerun (2026-09-07)
+
+Command:
+
+```bash
+python training/benchmark_globalosd.py --n 10 --seed 17 --subcat Ships --factor 8 --half 0.08 --tag diverse20_baseline
+```
+
+The run processed 10 ship-related oil points and 9 look-alike points; one requested look-alike location had no indexed intersecting scene for that date. At `oil_likelihood >= 0.50`, detection was **80.0%** and false alarms were **44.4%**. Oil-likelihood ROC AUC was **0.622**; segmentation-score AUC was **0.744**. This small rerun is worse than the earlier sample and is the stronger warning against presenting a single convenient sample as model accuracy.
+
+The exact input GeoTIFFs and per-case outputs are preserved at `demo/samples/globalosd_diverse20`. These labels identify centre points, not pixel masks, so this section still does not measure segmentation IoU.
+
+## 8. Integration and deployment audit (2026-09-19)
+
+* Offline suite: **17 passed, 3 skipped**. The Natural Earth 10 m land polygons are installed, so the land-mask and beaching regression now runs instead of skipping.
+* Opt-in live suite: **3 passed** — catalogue search, real Sentinel-1 pixel calibration, and HYCOM/Open-Meteo forcing construction.
+* HYCOM access was moved from the unreliable full OPeNDAP dataset open to the NetCDF Subset Service, limiting each request to the investigation bounding box and time window.
+* Public judge build: https://osi-sih26143.vercel.app. It is intentionally read-only and contains a generated snapshot of the synthetic case. The real-data ingestion backend is not exposed publicly until authentication, authorization, encryption, retention policy and agency AIS access are configured.
+* Browser verification: the deployed case reaches the evidence view, renders the radar/map layers and reports no console warnings. Its 75/100 vessel value is an explainable evidence-match score, not model accuracy or legal proof.

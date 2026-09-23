@@ -15,6 +15,7 @@ Outputs (demo/data/):
 from __future__ import annotations
 
 import json
+import argparse
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -24,9 +25,13 @@ import rasterio
 from rasterio.transform import from_origin
 import xarray as xr
 
-OUT = Path(__file__).resolve().parent / "data"
-OUT.mkdir(exist_ok=True)
-rng = np.random.default_rng(7)
+parser = argparse.ArgumentParser(description="Generate a labelled synthetic oil-spill test case.")
+parser.add_argument("--out", type=Path, default=Path(__file__).resolve().parent / "data")
+parser.add_argument("--seed", type=int, default=7)
+args = parser.parse_args()
+OUT = args.out
+OUT.mkdir(parents=True, exist_ok=True)
+rng = np.random.default_rng(args.seed)
 
 T_OBS = datetime(2025, 3, 14, 1, 12, 0, tzinfo=timezone.utc)   # S1 descending pass ~01 UTC local night
 T_SPILL = T_OBS - timedelta(hours=4, minutes=10)
@@ -105,7 +110,7 @@ with rasterio.open(OUT / "synthetic_s1_scene.tif", "w", driver="GTiff", height=H
                    crs="EPSG:4326", transform=transform, compress="deflate", tiled=True) as dst:
     dst.write(vv_db, 1); dst.write(vh_db, 2)
     dst.update_tags(synthetic="true", sensing_time=T_OBS.isoformat(), platform="SYNTHETIC-S1-LIKE",
-                    polarisation="VV,VH", units="sigma0 dB", note="Synthetic scene for offline demo – NOT real Sentinel-1 data")
+                    polarisation="VV,VH", units="sigma0 dB", seed=args.seed, note="Synthetic scene for offline demo – NOT real Sentinel-1 data")
 with rasterio.open(OUT / "synthetic_gt_mask.tif", "w", driver="GTiff", height=H, width=W, count=1, dtype="uint8",
                    crs="EPSG:4326", transform=transform, compress="deflate") as dst:
     dst.write(gt_mask, 1)
@@ -171,6 +176,6 @@ pd.DataFrame(rows_ais).to_csv(OUT / "synthetic_ais.csv", index=False)
 
 json.dump({"synthetic": True, "t_obs": T_OBS.isoformat(), "t_spill_start": T_SPILL.isoformat(),
            "origin_lon": ORIGIN[0], "origin_lat": ORIGIN[1], "culprit_mmsi": 419000101,
-           "true_age_hours": 4.17, "description": "Synthetic Arabian Sea discharge scenario for SIH26143 offline demo"},
+           "true_age_hours": 4.17, "seed": args.seed, "description": "Synthetic Arabian Sea discharge scenario for SIH26143 offline demo"},
           open(OUT / "scenario.json", "w"), indent=2)
 print("demo data written to", OUT, "slick centre", c_lon, c_lat, "gt px", int(gt_mask.sum()))

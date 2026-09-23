@@ -29,4 +29,4 @@ if envf.exists():
 port = os.environ.get("PORT", "8000")
 print(f"Oil Spill Intelligence → http://localhost:{port}  (Ctrl-C to stop)")
 os.chdir(ROOT / "backend")
-os.execve(str(PY), [str(PY), "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", port], env)
+subprocess.check_call([str(PY), "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", port], env=env)

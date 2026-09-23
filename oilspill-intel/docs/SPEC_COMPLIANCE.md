@@ -1,4 +1,4 @@
-# SIH 26143 – specification compliance matrix (verified 2026-09-05)
+# SIH 26143 – specification compliance matrix (verified 2026-09-19)
 
 Legend: ✅ working & verified live in this build · 🟡 working with stated limitation · ❌ not possible / not claimed
 
@@ -11,7 +11,7 @@ Legend: ✅ working & verified live in this build · 🟡 working with stated li
 | Age estimation "if feasible" | 🟡 | Drift page "Origin window" | **No single-image age method exists (verified literature)**. System outputs an *age-hypothesis set* (1 h … N h) each with its own origin ellipse; never a fake age. |
 | **(b) Trace slick back to origin (point + time)** | ✅ | `drift/engine.py`, `pipeline.hindcast` | Backward Lagrangian particles (wind factor 2–4 %, 10–20° Coriolis deflection hemisphere-aware, beaching on Natural Earth coastline) on **real HYCOM currents + real ERA5 wind** (built in ~3 s, no account); output = per-hour origin hypotheses with 50/90 % ellipses; stated as modelled, not exact. |
 | Predict future flow | ✅ | same, `forward_hours` | Forward run on the same forcing incl. HYCOM 8-day forecast when t_obs is recent. |
-| Oceanographic + meteorological data | ✅ | `integrations/metocean.py` | HYCOM (2018-12→now+8 d), Open-Meteo ERA5 (1940→now-5 d); CMEMS optional with free account. |
+| Oceanographic + meteorological data | ✅ | `integrations/metocean.py` | HYCOM NetCDF Subset Service (2018-12→now+8 d), Open-Meteo archive/forecast wind; CMEMS optional with an account. Live connector checks passed 2026-09-19. |
 | **(c) Historic AIS retrieval** | 🟡 | `integrations/ais_sources.py`, upload | MarineCadastre (US, verified 2023) and DMA (DK) fetched automatically; **no free global archive exists** → other regions via CSV upload/licensed feed (documented). aisstream = live only. |
 | Reconstruct traffic in space-time window | ✅ | `ais/pipeline.py` | Cleaning (dupes, impossible speed, bad MMSI), track building, gap detection, dead-reckoning across gaps, spatio-temporal window from origin hypotheses. Verified on 91 684 real messages / 454 vessels. |
 | Filter irrelevant traffic | ✅ | `ais/correlate.py` | Window filter + spatial-consistency gate (necessary condition). |

@@ -2,7 +2,7 @@
 
 Currents
   * HYCOM ESPC-D-V02 (Aug-2024 → now, 3-hourly, 1/12°) and GLBy0.08 expt_93.0
-    (Dec-2018 → Sep-2024) via OPeNDAP – **no account**  [verified live].
+    (Dec-2018 → Sep-2024) via the NetCDF Subset Service – **no account**.
   * Copernicus Marine (CMEMS) via the official `copernicusmarine` toolbox –
     free account (OSI_CMEMS_USER / OSI_CMEMS_PASSWORD); hourly 1/12° surface.
 Wind
@@ -21,9 +21,9 @@ import requests
 import xarray as xr
 
 HYCOM = {
-    "espc": {"u": "https://tds.hycom.org/thredds/dodsC/ESPC-D-V02/u3z", "v": "https://tds.hycom.org/thredds/dodsC/ESPC-D-V02/v3z",
+    "espc": {"u": "https://ncss.hycom.org/thredds/ncss/grid/ESPC-D-V02/u3z", "v": "https://ncss.hycom.org/thredds/ncss/grid/ESPC-D-V02/v3z",
              "start": datetime(2024, 8, 10, tzinfo=timezone.utc)},
-    "glby93": {"uv": "https://tds.hycom.org/thredds/dodsC/GLBy0.08/expt_93.0/uv3z",
+    "glby93": {"uv": "https://ncss.hycom.org/thredds/ncss/grid/GLBy0.08/expt_93.0/uv3z",
                "start": datetime(2018, 12, 4, tzinfo=timezone.utc), "end": datetime(2024, 9, 5, tzinfo=timezone.utc)},
 }
 
@@ -34,7 +34,7 @@ def _hycom_url(t0: datetime) -> tuple[str, dict]:
         return "HYCOM ESPC-D-V02", {"water_u": HYCOM["espc"]["u"], "water_v": HYCOM["espc"]["v"]}
     if t0 >= HYCOM["glby93"]["start"]:
         return "HYCOM GLBy0.08 expt_93.0", {"water_u": HYCOM["glby93"]["uv"], "water_v": HYCOM["glby93"]["uv"]}
-    raise ValueError("HYCOM OPeNDAP archive here starts 2018-12-04; use CMEMS GLORYS for earlier dates")
+    raise ValueError("The configured HYCOM archive starts 2018-12-04; use CMEMS GLORYS for earlier dates")
 
 
 def _hycom_subset(bbox, t0: datetime, t1: datetime) -> xr.Dataset:
@@ -43,23 +43,26 @@ def _hycom_subset(bbox, t0: datetime, t1: datetime) -> xr.Dataset:
     src, urls = _hycom_url(t0)
     out = {}
     for var, url in urls.items():
-        ds = netCDF4.Dataset(url)
-        lon = ds["lon"][:]; lat = ds["lat"][:]; tm = ds["time"]
+        # ESPC archives are split by year; GLBy exposes one complete aggregation.
+        if src.startswith("HYCOM ESPC") and t0.year == t1.year:
+            url = f"{url}/{t0.year}"
+        params = {"var": var, "north": lat1, "south": lat0, "west": lon0, "east": lon1,
+                  "time_start": t0.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                  "time_end": t1.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                  "vertCoord": 0, "accept": "netcdf4"}
+        response = requests.get(url, params=params, timeout=90)
+        response.raise_for_status()
+        ds = netCDF4.Dataset("hycom-subset.nc", memory=response.content)
+        lon = np.asarray(ds["lon"][:]); lat = np.asarray(ds["lat"][:]); tm = ds["time"]
         tvals = netCDF4.num2date(tm[:], tm.units, only_use_cftime_datetimes=False)
-        tvals = np.array([pd.Timestamp(t).tz_localize("UTC") for t in tvals])
-        # HYCOM lon is 0..360
-        qlon0, qlon1 = lon0 % 360, lon1 % 360
-        i0, i1 = np.searchsorted(lon, qlon0) - 1, np.searchsorted(lon, qlon1) + 1
-        j0, j1 = np.searchsorted(lat, lat0) - 1, np.searchsorted(lat, lat1) + 1
-        k0 = max(int(np.searchsorted(tvals, pd.Timestamp(t0))) - 1, 0); k1 = min(int(np.searchsorted(tvals, pd.Timestamp(t1))) + 1, len(tvals))
-        data = ds[var][k0:k1, 0, j0:j1, i0:i1].astype("float32")          # depth index 0 = surface
+        data = ds[var][:, 0].astype("float32")                            # depth index 0 = surface
         data = np.ma.filled(data, np.nan)
         out[var] = xr.DataArray(data, dims=("time", "lat", "lon"),
-                                coords={"time": [t.tz_convert(None) for t in tvals[k0:k1]], "lat": lat[j0:j1],
-                                        "lon": ((lon[i0:i1] + 180) % 360) - 180})
+                                coords={"time": pd.to_datetime(tvals), "lat": lat,
+                                        "lon": ((lon + 180) % 360) - 180})
         ds.close()
     res = xr.Dataset({"uo": out["water_u"], "vo": out["water_v"]}).sortby("lon")
-    res.attrs["current_source"] = src + " (OPeNDAP, tds.hycom.org)"
+    res.attrs["current_source"] = src + " (NetCDF Subset Service, hycom.org)"
     return res
 
 

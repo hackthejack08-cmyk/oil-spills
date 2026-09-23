@@ -1,10 +1,13 @@
 services:
   osi:
+    image: ${OSI_IMAGE:-osi-sih26143:local}
     build: { context: ., dockerfile: docker/Dockerfile }
     ports: ["8000:8000"]
+    restart: unless-stopped
     volumes:
       - ./backend/models:/srv/models      # drop unet_s1_oil.pt here to switch from baseline to CNN
       - osi_runtime:/srv/runtime
+      - ./deployment-data:/srv/imports:ro # optional agency AIS CSV / private deployment data
     env_file: [ { path: .env, required: false } ]   # credentials for optional connectors, see .env.example
     environment:
       - OSI_SEG_THRESHOLD=0.5
@@ -14,4 +17,7 @@ services:
       - OSI_CMEMS_USER=${OSI_CMEMS_USER:-}
       - OSI_CMEMS_PASSWORD=${OSI_CMEMS_PASSWORD:-}
       - OSI_AISSTREAM_KEY=${OSI_AISSTREAM_KEY:-}
+      - OSI_DEFAULT_AIS_CSV=${OSI_DEFAULT_AIS_CSV:-}
+    tmpfs:
+      - /tmp:size=256m
 volumes: { osi_runtime: {} }

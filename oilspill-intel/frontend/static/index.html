@@ -4,47 +4,90 @@
 <meta charset="utf-8">
 <title>OSI — Oil Spill Intelligence | SIH26143</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="SIH26143 research prototype for satellite oil-slick detection, drift reconstruction and explainable AIS vessel correlation.">
 <link rel="stylesheet" href="vendor/leaflet.css">
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
-<header>
-  <div class="brand"><span class="dot"></span>OSI <small>Oil Spill Intelligence · SIH26143 · NTRO</small></div>
-  <nav id="nav">
-    <button data-page="dashboard" class="active">1 Mission</button>
-    <button data-page="satellite">2 Satellite</button>
-    <button data-page="drift">3 Drift</button>
-    <button data-page="ais">4 AIS</button>
-    <button data-page="ranking">5 Ranking</button>
-    <button data-page="evidence">6 Evidence</button>
-    <button data-page="data">7 Data Sources</button>
+<a class="skip-link" href="#sidebar">Skip to investigation controls</a>
+<header class="rail">
+  <div class="brand">OSI <small>Oil spill analysis</small></div>
+  <nav id="nav" aria-label="Investigation stages">
+    <button data-page="dashboard" class="active" aria-current="page">Overview</button>
+    <button data-page="satellite">Image analysis</button>
+    <button data-page="drift">Drift</button>
+    <button data-page="ais">Vessel tracks</button>
+    <button data-page="ranking">Candidates</button>
+    <button data-page="evidence">Evidence</button>
+    <button data-page="data">Data sources</button>
   </nav>
-  <div class="status" id="health">● connecting…</div>
+  <div class="rail-foot"><div class="status" id="health" role="status">Connecting…</div></div>
 </header>
-
+<div class="workspace">
+<div class="workspace-head">
+  <div class="head-title"><h1 id="caseTitle">Oil spill investigation</h1><span id="caseId" class="case-ref">New case</span></div>
+  <div class="head-actions"><span id="dataBadge" class="badge">No case</span><button id="btnExport" class="outline" disabled>Export evidence</button></div>
+</div>
+<div id="caseSummary" class="summary-strip">Upload a georeferenced SAR image or open the sample case.</div>
+<div id="notice" class="notice" role="status" aria-live="polite" hidden><span id="noticeText"></span><button id="dismissNotice" aria-label="Dismiss message">×</button></div>
 <main>
-  <aside id="sidebar">
+  <div class="map-workspace">
+    <div class="map-heading"><span><b>Investigation map</b> <small>WGS84 · UTC</small></span><div><button id="btnFit" class="map-button" disabled>Fit scene</button><label class="chk"><input type="checkbox" id="chkScene" checked> Radar layer</label></div></div>
+    <div class="map-stage"><div id="map" aria-label="Oil-spill investigation map"></div>
+      <div id="mapEmpty" class="map-empty"><strong>No analysis loaded</strong><p>Upload an image from the right panel or use the sample data.</p><button id="btnStartDemo" class="secondary">Use sample data</button></div>
+      <details class="legend-wrap"><summary>Map legend</summary><div id="legend" class="legend"></div></details>
+    </div>
+    <section class="case-bottom" aria-label="Candidate overview"><div class="section-heading"><h2>Candidate vessels</h2><span class="muted small">Evidence match ≠ responsibility</span></div><div id="candidateOverview" class="table-scroll"><p class="empty-note">Candidates appear after satellite analysis, drift modelling and AIS correlation.</p></div></section>
+  </div>
+  <aside id="sidebar" tabindex="-1" aria-label="Investigation controls and evidence">
     <section id="page-dashboard" class="page active">
-      <h2>Mission Dashboard</h2>
-      <button id="btnDemo" class="primary">▶ Run offline demo investigation</button>
-      <button id="btnNew" class="secondary">＋ New real-data investigation</button>
-      <label>Open existing <select id="invSel"><option value="">— select —</option></select></label>
-      <p class="muted small">Bundled scenario is <b>SYNTHETIC</b> (scene, ocean forcing, AIS). Real mode accepts Sentinel-1 GRD σ⁰ GeoTIFF + CMEMS/ERA5 NetCDF + AIS CSV.</p>
+      <h2>New analysis</h2>
+      <p class="section-intro">Provide one georeferenced Sentinel-1 SAR image. The system reads its location and observation time from the file.</p>
+      <div class="image-workflow">
+        <label>SAR GeoTIFF <input type="file" id="autoSceneFile" accept=".tif,.tiff"></label>
+        <p class="sample-download"><a id="sampleSceneDownload" href="/api/demo/sample-scene" download="OSI_sample_20250314.tif">Download test image</a><span>28.4 MB · synthetic</span></p>
+        <button id="btnAutoRun" class="primary">Analyse image</button>
+        <div id="autoProgress" class="small muted" role="status"></div>
+        <small>Runs detection, drift reconstruction, vessel matching and evidence export.</small>
+        <p class="demo-only">The public demo accepts the provided test image and replays its verified result.</p>
+      </div>
+      <button id="btnDemo" class="visually-hidden" tabindex="-1">Run included sample</button>
+      <details class="case-meta"><summary>Case information</summary>
+        <div class="sih-brief" aria-label="Smart India Hackathon problem alignment">
+          <div><span>Problem</span><b>SIH26143</b></div><div><span>Organization</span><b>NTRO</b></div>
+          <div><span>Category</span><b>Software</b></div><div><span>Theme</span><b>Disaster Management</b></div>
+        </div>
+      </details>
+      <details class="prototype-scope"><summary>Method and limitations</summary>
+        <ol class="scope-steps">
+          <li>Segments suspected dark formations from georeferenced Sentinel-1 SAR.</li>
+          <li>Measures slick geometry and reconstructs possible origins using currents and wind.</li>
+          <li>Rebuilds historical AIS tracks and filters vessels by time and location.</li>
+          <li>Ranks evidence matches and exports an auditable record for analyst review.</li>
+        </ol>
+        <p class="small muted">Attribution is a decision-support result and requires analyst review.</p>
+      </details>
+      <details><summary>Advanced / manual workflow</summary>
+        <button id="btnNew" class="secondary">New real-data investigation</button>
+        <label>Open existing <select id="invSel"><option value="">— select —</option></select></label>
+      </details>
+      <p class="muted small">The sample uses synthetic scene, forcing and AIS data. Operational use requires approved historical AIS access.</p>
+      <p id="landWarning" class="warn small" hidden>Land polygon file is missing. Coastal masking and particle beaching must not be treated as verified in this installation.</p>
       <div class="kpis" id="kpis"></div>
-      <h3>Timeline</h3><ol id="timeline" class="timeline"></ol>
-      <h3>System / data health</h3><pre id="healthBox" class="box"></pre>
+      <h3 id="timelineHeading" hidden>Timeline</h3><ol id="timeline" class="timeline"></ol>
+      <details><summary>System / data health</summary><pre id="healthBox" class="box"></pre></details>
     </section>
 
     <section id="page-satellite" class="page">
       <h2>Satellite Analysis</h2>
       <label>Scene <select id="sceneSel"><option value="demo">Bundled synthetic S1-like scene</option></select></label>
-      <p class="muted small">Real Sentinel-1 scenes: fetch them on <a href="#" onclick="goto('data');return false">7 Data Sources</a> (CDSE) or upload a σ⁰ GeoTIFF.</p>
+      <p class="muted small">For the simplest flow, upload one image on <a href="#" onclick="goto('dashboard');return false">Overview</a>. Manual mode can also use a scene fetched on <a href="#" onclick="goto('data');return false">Data Sources</a>.</p>
       <label>Upload GeoTIFF (σ⁰ VV[,VH], dB or linear) <input type="file" id="sceneFile" accept=".tif,.tiff"></label>
-      <label>Wind at scene (m/s, optional) <input type="number" id="windIn" step="0.1" placeholder="from forcing if blank"></label>
-      <button id="btnAnalyze" class="primary">Run preprocessing + segmentation</button>
+      <details><summary>Optional wind override</summary><label>Wind at scene (m/s) <input type="number" id="windIn" step="0.1" placeholder="from forcing if blank"></label></details>
+      <button id="btnAnalyze" class="primary">Analyse selected image</button>
       <div id="sceneInfo"></div>
       <h3>Detections</h3><div id="detList"></div>
-      <label class="chk"><input type="checkbox" id="chkProb" checked> show probability map</label>
+      <label class="chk"><input type="checkbox" id="chkProb"> Detection score overlay (not calibrated probability)</label>
     </section>
 
     <section id="page-drift" class="page">
@@ -52,14 +95,14 @@
       <label>Backward horizon (h) <input type="number" id="hoursIn" value="12" min="1" max="72"></label>
       <label>Forward forecast (h) <input type="number" id="fwdIn" value="6" min="0" max="72"></label>
       <label>Forcing (currents + wind) <select id="forcingSel"><option value="demo">Bundled synthetic forcing</option></select></label>
-      <button id="btnForcing" class="secondary">⇣ Build real forcing for this scene (HYCOM + ERA5, no account)</button>
+      <label>Upload current / wind NetCDF <input type="file" id="forcingFile" accept=".nc"></label>
+      <button id="btnForcing" class="secondary">Build environmental forcing for this scene</button>
       <div id="forcingJob" class="small muted"></div>
       <button id="btnDrift" class="primary">Run backward hindcast + forward forecast</button>
       <div id="driftInfo"></div>
       <label>Age hypothesis <input type="range" id="ageSlider" min="1" max="12" value="4"> <span id="ageLbl">4 h</span></label>
-      <label class="chk"><input type="checkbox" id="chkVec" checked> current / wind vectors</label>
       <label class="chk"><input type="checkbox" id="chkFwd" checked> forward prediction</label>
-      <pre id="driftParams" class="box small"></pre>
+      <details><summary>Model assumptions</summary><pre id="driftParams" class="box small"></pre></details>
     </section>
 
     <section id="page-ais" class="page">
@@ -68,7 +111,7 @@
       <label>Upload AIS CSV <input type="file" id="aisFile" accept=".csv"></label>
       <label>Search radius (km) <input type="number" id="radiusIn" value="60"></label>
       <label>Fetch historical AIS for this scene <select id="aisSrcSel"><option value="marinecadastre">NOAA MarineCadastre (US waters, 2009–2023 direct)</option><option value="dma">Danish Maritime Authority</option><option value="aisstream">aisstream.io live recording (key)</option></select></label>
-      <button id="btnAisFetch" class="secondary">⇣ Fetch AIS (background job)</button>
+      <button id="btnAisFetch" class="secondary">Fetch available AIS records</button>
       <div id="aisJob" class="small muted"></div>
       <button id="btnAis" class="primary">Reconstruct tracks + correlate</button>
       <div id="aisInfo"></div>
@@ -87,7 +130,7 @@
     <section id="page-ranking" class="page">
       <h2>Vessel Ranking</h2>
       <p class="warn small">Scores express <b>correlation with available evidence</b>. They are not proof of responsibility.</p>
-      <div id="rankTable"></div>
+      <div id="rankTable" class="table-scroll"><p class="empty-note">Run AIS correlation to review candidates.</p></div>
     </section>
 
     <section id="page-data" class="page">
@@ -103,23 +146,18 @@
       <label>Downsample factor (4 → ~40 m px, ~20 s; 1 → full 10 m, slow) <input type="number" id="s1factor" value="4" min="1" max="16"></label>
       <h3>Background jobs</h3><div id="jobList" class="small"></div>
       <h3>Fetched / uploaded products</h3><div id="uploadList" class="small"></div>
-      <h3>Credentials (server environment variables, never sent to browser)</h3>
-      <pre class="box small">OSI_CDSE_USER / OSI_CDSE_PASSWORD   – Sentinel-1 download (free)
-OSI_CMEMS_USER / OSI_CMEMS_PASSWORD – Copernicus Marine currents (free; HYCOM needs none)
-OSI_AISSTREAM_KEY                   – live AIS recording (free; historical AIS needs none)</pre>
     </section>
 
     <section id="page-evidence" class="page">
       <h2>Evidence View</h2>
-      <div id="evidencePanel"><p class="muted">Select a vessel from the ranking table.</p></div>
-      <h3>Evidence ledger (SHA-256)</h3><div id="ledger" class="small"></div>
+      <div id="evidencePanel"><p class="empty-note">Select a candidate from the table below the map.</p></div>
+      <details><summary>Evidence ledger (SHA-256)</summary><div id="ledger" class="small table-scroll"></div></details>
     </section>
   </aside>
 
-  <div id="map"></div>
-  <div id="legend" class="legend"></div>
 </main>
-<footer>Open-source · zero-cost · offline-capable. Attribution: Copernicus Sentinel data / E.U. Copernicus Marine Service Information / NOAA MarineCadastre AIS (real mode). Coastline: Natural Earth (public domain).</footer>
+<footer>Decision support only. Results require analyst review.<span>Offline coastline: Natural Earth</span></footer>
+</div>
 <script src="vendor/leaflet.js"></script>
 <script src="app.js"></script>
 </body>
