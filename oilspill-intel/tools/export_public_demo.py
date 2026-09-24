@@ -91,7 +91,6 @@ def main() -> None:
     (OUT / "vercel.json").write_text(
         json.dumps(
             {
-                "public": True,
                 "cleanUrls": True,
                 "headers": [
                     {
