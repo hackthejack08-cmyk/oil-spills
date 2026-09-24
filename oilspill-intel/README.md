@@ -4,7 +4,7 @@ One georeferenced SAR image → segmentation → geometry → environmental forc
 
 The user-facing path needs only one Sentinel-1 GeoTIFF. The server reads location and capture time from the image, fetches currents/wind, and uses authorized historical AIS when the deployment has it. The included synthetic sample runs the entire chain offline.
 
-**Public SIH judge demo:** https://osi-sih26143.vercel.app — read-only bundled synthetic case. The full FastAPI build below enables real uploads/connectors and must be secured before operational deployment.
+**Public SIH judge demo:** https://public-demo-one.vercel.app — read-only bundled synthetic case. The full FastAPI build below enables real uploads/connectors and must be secured before operational deployment.
 
 The judge link is a static, deterministic replay, so it does not depend on a sleeping backend. Select **Arabian Sea synthetic replay** or **Run historical replay**, then pause, restart or change speed while the six processing stages appear. Map controls independently show SAR, a visual-only contrast preview, the suspected slick, modelled drift and historical AIS. Observed, processed and modelled products are labelled separately; vessel ranking is an investigation lead, not proof of responsibility.
 
