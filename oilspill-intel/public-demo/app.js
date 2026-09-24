@@ -3,18 +3,47 @@ const S = { inv: null, scene: null, detection: null, drift: null, ais: null, sel
 window.S = S;
 const $ = (q) => document.querySelector(q);
 const esc = (x) => String(x ?? "").replace(/[<>&"']/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&#39;" }[c]));
+const PIPELINE_STAGES = [
+  ["acquisition", "SAR acquired"], ["preprocessing", "Preprocessed"], ["detection", "Slick detection"],
+  ["drift", "Drift model"], ["ais", "AIS correlation"], ["evidence", "Evidence"],
+];
+const stageState = Object.fromEntries(PIPELINE_STAGES.map(([id]) => [id, "waiting"]));
+const replay = { result: null, index: -1, timer: null, paused: false, active: false };
 function notify(message, error = false) {
   $("#noticeText").textContent = message; $("#notice").hidden = false;
   $("#notice").classList.toggle("error", error);
 }
 $("#dismissNotice").onclick = () => $("#notice").hidden = true;
+function renderStageStatus() {
+  $("#stageList").innerHTML = PIPELINE_STAGES.map(([id, label]) => `<li class="${stageState[id]}" aria-label="${esc(label)}: ${stageState[id]}">${esc(label)}</li>`).join("");
+  const values = Object.values(stageState);
+  $("#systemValue").textContent = values.includes("failed") ? "Review required" : values.includes("running") ? "Processing" : values.includes("partial") ? "Partial" : values.every((v) => v === "complete") ? "Complete" : "Ready";
+}
+function setStage(id, status) { stageState[id] = status; renderStageStatus(); }
+function resetStages() { PIPELINE_STAGES.forEach(([id]) => { stageState[id] = "waiting"; }); renderStageStatus(); }
+function completeAvailableStages() {
+  if (S.scene) { setStage("acquisition", "complete"); setStage("preprocessing", "complete"); setStage("detection", S.scene.detections?.length ? "complete" : "partial"); }
+  if (S.drift) setStage("drift", "complete");
+  if (S.ais) { setStage("ais", "complete"); setStage("evidence", "complete"); }
+}
+
+let demoDataPromise;
+function loadPublicDemoData() {
+  if (window.OSI_DEMO_DATA) return Promise.resolve(window.OSI_DEMO_DATA);
+  if (!demoDataPromise) demoDataPromise = new Promise((resolve, reject) => {
+    const script = document.createElement("script"); script.src = "demo-data.js";
+    script.onload = () => window.OSI_DEMO_DATA ? resolve(window.OSI_DEMO_DATA) : reject(new Error("Public demo data is incomplete."));
+    script.onerror = () => reject(new Error("Public demo data could not be loaded. Check the connection and retry."));
+    document.head.appendChild(script);
+  });
+  return demoDataPromise;
+}
 const publicDemoApi = async (path) => {
-  const data = window.OSI_DEMO_DATA;
-  if (!data) throw new Error("Public demo data did not load.");
-  if (path === "/api/health") return data.health;
+  if (path === "/api/health") return { status: "public-demo", cnn_weights: true, land_mask_available: true, mode: "static replay" };
+  if (path === "/api/data/jobs" || path === "/api/uploads") return [];
+  const data = await loadPublicDemoData();
   if (path === "/api/demo/run") return data.case;
   if (path === "/api/data/status") return data.status;
-  if (path === "/api/data/jobs" || path === "/api/uploads") return [];
   if (path === "/api/investigations") return [data.case.investigation];
   if (path.startsWith("/api/investigations/")) return data.case;
   if (path.startsWith("/api/vessels/")) return data.vessels[path.split("/")[3].split("?")[0]];
@@ -64,7 +93,7 @@ document.querySelectorAll("#nav button").forEach((b) => b.onclick = () => {
 const goto = (p) => document.querySelector(`#nav button[data-page=${p}]`).click();
 
 /* ---------------- health ---------------- */
-api("/api/health").then((h) => { $("#health").textContent = `● API online · ${h.cnn_weights ? "weights present" : "baseline detector"}`; $("#healthBox").textContent = JSON.stringify(h, null, 1); $("#landWarning").hidden = h.land_mask_available !== false; })
+api("/api/health").then((h) => { $("#health").textContent = window.OSI_PUBLIC_DEMO ? "● Public replay ready" : `● API online · ${h.cnn_weights ? "weights present" : "baseline detector"}`; $("#healthBox").textContent = JSON.stringify(h, null, 1); $("#landWarning").hidden = h.land_mask_available !== false; })
   .catch(() => ($("#health").textContent = "● API offline"));
 
 /* ---------------- uploads ---------------- */
@@ -91,6 +120,7 @@ async function ensureInv() {
 }
 async function analyzeScene() {
   $("#btnAnalyze").disabled = true;
+  resetStages(); setStage("acquisition", "running");
   try {
     const pending = $("#sceneFile").files[0];
     if (pending) await upload("scene", pending, $("#sceneSel"));
@@ -99,8 +129,9 @@ async function analyzeScene() {
     const scene = await api("/api/satellite/analyze", { investigation_id: S.inv.id, scene: $("#sceneSel").value, wind_ms: wind });
     resetResults(); S.scene = scene;
     renderScene(); log(`scene analysed by ${S.scene.detector} in ${S.scene.processing_s}s → ${S.scene.detections.length} object(s)`);
+    setStage("acquisition", "complete"); setStage("preprocessing", "complete"); setStage("detection", scene.detections.length ? "complete" : "partial");
     notify(`${scene.detections.length} suspected object(s) detected. Review before running drift.`); refreshInvestigations();
-  } catch (e) { notify(e.message, true); } finally { $("#btnAnalyze").disabled = false; }
+  } catch (e) { setStage("acquisition", "failed"); notify(e.message, true); } finally { $("#btnAnalyze").disabled = false; }
 }
 function renderScene() {
   const s = S.scene; const b = s.bbox; const bounds = [[b[1], b[0]], [b[3], b[2]]];
@@ -108,6 +139,7 @@ function renderScene() {
   layers.scene = s.quicklook ? L.imageOverlay(s.quicklook, bounds, { opacity: $("#chkScene").checked ? 0.85 : 0 }).addTo(map) : null;
   layers.prob = s.prob_overlay ? L.imageOverlay(s.prob_overlay, bounds, { opacity: $("#chkProb").checked ? 0.8 : 0 }).addTo(map) : null;
   if (layers.scene) layers.scene.on("error", () => notify("Radar preview file is unavailable. Re-analyse this scene to regenerate it.", true));
+  applyImagePreview();
   layers.slick.clearLayers(); s.detections.forEach((d) => layers.slick.addData({ type: "Feature", properties: d, geometry: d.geometry.polygon_geojson }));
   layers.slick.eachLayer((l) => l.bindTooltip(`${l.feature.properties.label} · ${fmt(l.feature.properties.geometry.area_km2)} km²`));
   map.fitBounds(bounds);
@@ -123,7 +155,7 @@ function renderScene() {
   kpis();
 }
 window.selectDet = (id) => {
-  if (S.detection?.id !== id) { clearDownstream(); S.detection = S.scene.detections.find((d) => d.id === id); kpis(); }
+  if (S.detection?.id !== id) { clearDownstream(); ["drift", "ais", "evidence"].forEach((stage) => setStage(stage, "waiting")); S.detection = S.scene.detections.find((d) => d.id === id); kpis(); }
   goto("drift");
 };
 $("#btnAnalyze").onclick = analyzeScene;
@@ -132,14 +164,16 @@ $("#chkProb").onchange = () => layers.prob && layers.prob.setOpacity($("#chkProb
 /* ---------------- stage 2: drift ---------------- */
 async function runDrift() {
   if (!S.detection) return notify("Analyse a scene and select a detection first.", true);
-  $("#btnDrift").disabled = true;
+  $("#btnDrift").disabled = true; ["ais", "evidence"].forEach((stage) => setStage(stage, "waiting"));
+  setStage("drift", "running");
   try {
     notify("Modelling possible origins and future drift…");
     const drift = await api("/api/drift/hindcast", { investigation_id: S.inv.id, detection_id: S.detection.id, forcing: $("#forcingSel").value, hours: +$("#hoursIn").value, forward_hours: +$("#fwdIn").value });
     clearDownstream(); S.drift = drift;
     $("#ageSlider").max = S.drift.backward.hypotheses.length; renderDrift(); log(`hindcast: ${S.drift.backward.hypotheses.length} age hypotheses, wind ${S.drift.wind_at_slick_ms} m/s`);
+    setStage("drift", "complete");
     notify("Drift complete. Origin times are hypotheses, not measured spill age.");
-  } catch (e) { notify(e.message, true); } finally { $("#btnDrift").disabled = false; }
+  } catch (e) { setStage("drift", "failed"); notify(e.message, true); } finally { $("#btnDrift").disabled = false; }
 }
 function renderDrift() {
   const d = S.drift; ["ellipses", "back", "fwd", "vectors"].forEach((k) => layers[k].clearLayers());
@@ -180,14 +214,16 @@ $("#chkFwd").onchange = () => S.drift && renderDrift();
 /* ---------------- stage 3: AIS ---------------- */
 async function runAis() {
   if (!S.drift) return notify("Run the hindcast first, then correlate AIS vessel tracks.", true);
-  $("#btnAis").disabled = true;
+  $("#btnAis").disabled = true; setStage("evidence", "waiting");
+  setStage("ais", "running");
   try {
     notify("Cleaning AIS observations and comparing vessel tracks…");
     S.ais = await api("/api/ais/analyze", { investigation_id: S.inv.id, ais: $("#aisSel").value, radius_km: +$("#radiusIn").value });
     S.selectedVessel = null;
-    renderAis(); renderRanking(); loadLedger(); log(`AIS: ${S.ais.n_vessels_total} vessels, ${S.ais.n_candidates} candidates after filtering; dropped ${JSON.stringify(S.ais.cleaning.dropped)}`);
+    renderAis(); renderRanking(); await loadLedger(); log(`AIS: ${S.ais.n_vessels_total} vessels, ${S.ais.n_candidates} candidates after filtering; dropped ${JSON.stringify(S.ais.cleaning.dropped)}`);
+    setStage("ais", "complete"); setStage("evidence", "complete");
     notify("Vessel matching complete. Scores are evidence matches, not guilt probabilities.");
-  } catch (e) { notify(e.message, true); } finally { $("#btnAis").disabled = false; }
+  } catch (e) { setStage("ais", "failed"); notify(e.message, true); } finally { $("#btnAis").disabled = false; }
 }
 const catColor = { tanker: "#ff9f43", cargo: "#c8d3ea", fishing: "#7bd88f", passenger: "#a29bfe", other: "#8fa0c0" };
 function visibleTypes() { return [...document.querySelectorAll(".fType:checked")].map((e) => e.value); }
@@ -308,6 +344,8 @@ function kpis() {
   $("#caseId").textContent = S.inv ? S.inv.id : "New case";
   $("#dataBadge").textContent = S.inv ? S.scene?.synthetic || S.ais?.synthetic ? "Synthetic data" : S.inv.mode === "demo" ? "Demo data" : "Operational data" : "No case";
   $("#dataBadge").classList.toggle("la", S.inv?.mode === "demo");
+  $("#acquisitionValue").textContent = S.scene?.sensing_time ? S.scene.sensing_time.slice(0, 16).replace("T", " ") + "Z" : "—";
+  if (S.inv?.mode === "demo") $("#casePicker").value = "demo";
   $("#mapEmpty").hidden = Boolean(S.inv);
   $("#btnFit").disabled = !S.scene;
   $("#btnExport").disabled = !S.inv;
@@ -321,13 +359,13 @@ function kpis() {
 }
 
 async function applyCaseResult(r, message) {
-  resetResults();
+  resetResults(); resetStages();
   S.inv = r.investigation; S.scene = r.scene; S.detection = r.scene?.detections.find((d) => d.id === r.detection_id) || null;
   S.drift = r.drift; S.ais = r.ais;
   if (S.scene) renderScene();
   if (S.drift) { $("#ageSlider").max = S.drift.backward.hypotheses.length; renderDrift(); }
   if (S.ais) { renderAis(); renderRanking(); }
-  await loadLedger(); refreshInvestigations(); kpis();
+  await loadLedger(); refreshInvestigations(); kpis(); completeAvailableStages();
   const warnings = r.warnings || [];
   notify(warnings.length ? `${message} ${warnings.join(" ")}` : message);
   if (S.ais?.candidates.length) await showVessel(S.ais.candidates[0].mmsi);
@@ -394,18 +432,101 @@ $("#btnAutoRun").onclick = async () => {
   }
 };
 
-$("#btnDemo").onclick = async () => {
-  $("#btnDemo").disabled = true; $("#btnStartDemo").disabled = true;
-  notify("Running the synthetic scene → drift → AIS pipeline. Please wait…");
+function replayDelay() { return 720 / Number($("#replaySpeed").value || 1); }
+function replayTime(label) {
+  const observed = replay.result?.scene?.sensing_time?.slice(0, 16).replace("T", " ");
+  $("#replayClock").textContent = observed ? `${label} · acquisition ${observed}Z` : label;
+}
+async function revealReplayStage(id) {
+  const r = replay.result;
+  if (id === "acquisition") {
+    S.scene = { ...r.scene, detections: [] }; S.detection = null;
+    renderScene(); replayTime("Observed SAR loaded"); log("observed SAR acquisition loaded from the synthetic judge case");
+  } else if (id === "preprocessing") {
+    replayTime("Processed SAR preview"); log("processed: georeferenced, clipped and speckle-filtered for analysis");
+  } else if (id === "detection") {
+    S.scene = r.scene; S.detection = r.scene?.detections.find((d) => d.id === r.detection_id) || null;
+    renderScene(); replayTime("Suspected slick extracted"); log(`${S.scene.detections.length} suspected dark formation(s) measured`);
+  } else if (id === "drift") {
+    S.drift = r.drift; $("#ageSlider").max = S.drift.backward.hypotheses.length; renderDrift();
+    replayTime("Modelled origin and forecast"); log(`${S.drift.backward.hypotheses.length} release-time hypotheses reconstructed`);
+  } else if (id === "ais") {
+    S.ais = r.ais; renderAis(); renderRanking();
+    replayTime("Historical AIS correlated"); log(`${S.ais.n_candidates} candidate vessel lead(s) ranked from ${S.ais.n_vessels_total} tracks`);
+  } else if (id === "evidence") {
+    await loadLedger(); kpis(); renderCandidates();
+    replayTime("Evidence package ready"); log("auditable evidence record prepared for investigator review");
+  }
+}
+function runReplayStage() {
+  if (!replay.active || replay.paused) return;
+  const entry = PIPELINE_STAGES[replay.index];
+  if (!entry) return;
+  const [id, label] = entry; setStage(id, "running"); replayTime(label);
+  clearTimeout(replay.timer);
+  replay.timer = setTimeout(async () => {
+    try {
+      await revealReplayStage(id); setStage(id, "complete"); replay.index += 1;
+      if (replay.index >= PIPELINE_STAGES.length) {
+        replay.active = false; $("#btnReplayPause").disabled = true; $("#btnReplayPause").textContent = "Pause";
+        notify("Replay complete. Results are a synthetic investigation aid—not proof of pollution or vessel responsibility.");
+      } else runReplayStage();
+    } catch (error) {
+      replay.active = false; setStage(id, "failed"); notify(error.message, true);
+    }
+  }, replayDelay());
+}
+async function startHistoricalReplay() {
+  clearTimeout(replay.timer); replay.active = false;
+  $("#btnRunReplay").disabled = true; $("#btnStartDemo").disabled = true; $("#btnReplayRestart").disabled = true;
+  notify("Loading the deterministic synthetic replay…");
   try {
-    const r = await api("/api/demo/run", {});
-    await applyCaseResult(r, "Sample complete. Scene, ocean forcing and AIS are synthetic—not a real incident.");
-    log(`demo complete: ${S.scene.detections.length} detection(s), ${S.drift.backward.hypotheses.length} age hypotheses, ${S.ais.candidates.length} candidate(s)`);
-  } catch (e) { notify(e.message, true); } finally { $("#btnDemo").disabled = false; $("#btnStartDemo").disabled = false; }
+    const result = await api("/api/demo/run", {});
+    resetResults(); resetStages();
+    replay.result = result; replay.index = 0; replay.paused = false; replay.active = true;
+    S.inv = result.investigation; $("#casePicker").value = "demo"; kpis(); goto("dashboard");
+    $("#btnReplayPause").disabled = false; $("#btnReplayPause").textContent = "Pause";
+    runReplayStage();
+  } catch (error) { notify(error.message, true); }
+  finally { $("#btnRunReplay").disabled = false; $("#btnStartDemo").disabled = false; $("#btnReplayRestart").disabled = false; }
+}
+$("#btnReplayPause").onclick = () => {
+  if (!replay.active) return;
+  replay.paused = !replay.paused; $("#btnReplayPause").textContent = replay.paused ? "Resume" : "Pause";
+  clearTimeout(replay.timer);
+  if (replay.paused) replayTime("Replay paused"); else runReplayStage();
 };
-$("#btnStartDemo").onclick = () => $("#btnDemo").click();
+$("#replaySpeed").onchange = () => {
+  if (!replay.active || replay.paused) return;
+  clearTimeout(replay.timer); runReplayStage();
+};
+
+$("#btnDemo").onclick = async () => {
+  await startHistoricalReplay();
+};
+$("#btnStartDemo").onclick = startHistoricalReplay;
+$("#btnRunReplay").onclick = startHistoricalReplay;
+$("#btnReplayRestart").onclick = startHistoricalReplay;
 $("#btnFit").onclick = () => S.scene && map.fitBounds([[S.scene.bbox[1], S.scene.bbox[0]], [S.scene.bbox[3], S.scene.bbox[2]]]);
 $("#chkScene").onchange = () => layers.scene?.setOpacity($("#chkScene").checked ? 0.85 : 0);
+function setGroupVisibility(keys, visible) {
+  keys.forEach((key) => {
+    const layer = layers[key]; if (!layer) return;
+    if (visible && !map.hasLayer(layer)) layer.addTo(map);
+    if (!visible && map.hasLayer(layer)) map.removeLayer(layer);
+  });
+}
+function applyImagePreview() {
+  if (!layers.scene?._image) return;
+  layers.scene._image.classList.toggle("contrast-preview", $("#chkEnhanced").checked);
+}
+$("#chkEnhanced").onchange = () => {
+  applyImagePreview();
+  if ($("#chkEnhanced").checked) notify("Contrast preview is a visual aid only. Detection and measurements use the original SAR pixels.");
+};
+$("#chkSlick").onchange = () => setGroupVisibility(["slick"], $("#chkSlick").checked);
+$("#chkDriftLayers").onchange = () => setGroupVisibility(["ellipses", "back", "fwd", "vectors"], $("#chkDriftLayers").checked);
+$("#chkAisLayers").onchange = () => setGroupVisibility(["tracks", "positions", "gaps"], $("#chkAisLayers").checked);
 $("#btnExport").onclick = async () => {
   if (!S.inv) return;
   const inv = { ...S.inv };
@@ -436,12 +557,12 @@ $("#invSel").onchange = async (e) => {
   if (!e.target.value) return;
   try {
     const inv = await api(`/api/investigations/${e.target.value}`);
-    resetResults(); S.inv = inv.investigation; S.scene = inv.scene; S.drift = inv.drift; S.ais = inv.ais;
+    resetResults(); resetStages(); S.inv = inv.investigation; S.scene = inv.scene; S.drift = inv.drift; S.ais = inv.ais;
     S.detection = S.scene?.detections.find((d) => d.id === S.drift?.detection_id) || null;
     if (S.scene) renderScene();
     if (S.drift) { $("#ageSlider").max = S.drift.backward.hypotheses.length; renderDrift(); }
     if (S.ais) { renderAis(); renderRanking(); }
-    await loadLedger(); kpis(); log(`opened ${S.inv.id}`);
+    await loadLedger(); kpis(); completeAvailableStages(); log(`opened ${S.inv.id}`);
     notify(S.scene && !S.drift ? "Scene restored. Run drift and AIS to continue; older cases may not have saved full stage results." : "Saved investigation restored.");
     if (S.ais?.candidates.length) await showVessel(S.ais.candidates[0].mmsi); else goto(S.scene ? "satellite" : "dashboard");
   } catch (x) { notify(x.message, true); }
@@ -449,7 +570,7 @@ $("#invSel").onchange = async (e) => {
 $("#btnNew").onclick = async () => {
   const name = "Real-data investigation " + new Date().toISOString().slice(0, 16).replace("T", " ");
   try {
-    const inv = await api("/api/investigations", { name, mode: "real" }); resetResults(); S.inv = inv;
+    const inv = await api("/api/investigations", { name, mode: "real" }); resetResults(); resetStages(); S.inv = inv;
     ["sceneSel", "forcingSel", "aisSel"].forEach((id) => { const sel = $("#" + id); addOpt(sel, "", "Choose uploaded / fetched data", true); });
     log(`investigation ${S.inv.id} created (mode: real)`); kpis(); refreshInvestigations(); goto("satellite"); notify("Upload or fetch a radar scene. Check location and time coverage for every input.");
   } catch (e) { notify(e.message, true); }
@@ -524,7 +645,12 @@ $("#btnAisFetch").onclick = async () => {
 };
 
 document.querySelector('#nav button[data-page="data"]').addEventListener("click", () => { renderStatus(); renderJobs(); });
-refreshInvestigations(); renderJobs(); setInterval(renderJobs, 15000);
+$("#casePicker").onchange = (event) => {
+  if (event.target.value === "demo") startHistoricalReplay();
+  else if (!S.inv) goto("dashboard");
+};
+renderStageStatus();
+if (!window.OSI_PUBLIC_DEMO) { refreshInvestigations(); renderJobs(); setInterval(renderJobs, 15000); }
 
 // Keep a case/stage change from overtaking an in-flight analysis or case restore.
 let caseBusy = false;
@@ -557,4 +683,5 @@ if (window.OSI_PUBLIC_DEMO) {
   ["btnNew", "btnAnalyze", "btnDrift", "btnAis", "btnForcing", "btnAisFetch", "btnS1Search"].forEach((id) => {
     const control = document.getElementById(id); if (control) { control.disabled = true; control.title = "Available in the full FastAPI deployment"; }
   });
+  $("#health").textContent = "● Public replay ready";
 }

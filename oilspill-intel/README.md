@@ -6,11 +6,14 @@ The user-facing path needs only one Sentinel-1 GeoTIFF. The server reads locatio
 
 **Public SIH judge demo:** https://osi-sih26143.vercel.app — read-only bundled synthetic case. The full FastAPI build below enables real uploads/connectors and must be secured before operational deployment.
 
+The judge link is a static, deterministic replay, so it does not depend on a sleeping backend. Select **Arabian Sea synthetic replay** or **Run historical replay**, then pause, restart or change speed while the six processing stages appear. Map controls independently show SAR, a visual-only contrast preview, the suspected slick, modelled drift and historical AIS. Observed, processed and modelled products are labelled separately; vessel ranking is an investigation lead, not proof of responsibility.
+
 ```bash
 python app.py            # one command: creates .venv, installs deps, starts http://localhost:8000
                          # Windows: double-click run.bat · Linux/macOS: ./run.sh · or: docker compose up --build
-cd backend && pytest -q  # 18 offline tests incl. full chain (culprit must rank #1)
+cd backend && pytest -q  # 19 offline tests incl. full chain (culprit must rank #1)
 OSI_LIVE_TESTS=1 pytest -q backend/tests/test_integrations.py -k live   # 3 live tests against real services
+python tools/check_public_demo.py  # fast static-deployment regression check
 ```
 Full install guide & troubleshooting: `docs/INSTALL.md`. Spec compliance matrix: `docs/SPEC_COMPLIANCE.md` · measured results on real S1 data: `docs/EVALUATION.md`.
 
@@ -48,4 +51,4 @@ HYCOM/ERA5 forcing → real 2023 AIS). Credentials: copy `.env.example` → `.en
 
 Real upload test pack: `demo/samples/globalosd_diverse20/README.md` (19 Sentinel-1 GeoTIFFs with oil/look-alike point labels and expected baseline results). Backend/model plan and current limitations: `docs/PRD_BACKEND_MODEL_AND_DATA.md` and `docs/BACKEND_MODEL_HANDOFF.md`.
 
-Tests: `pytest backend/tests` (18 passed, 3 credential/network checks skipped on 2026-09-19); `OSI_LIVE_TESTS=1 pytest backend/tests/test_integrations.py -k live`.
+Tests: `cd backend && pytest -q` (19 passed, 3 credential/network checks skipped on 2026-09-24); `OSI_LIVE_TESTS=1 pytest backend/tests/test_integrations.py -k live`.

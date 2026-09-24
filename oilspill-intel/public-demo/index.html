@@ -26,13 +26,26 @@
 <div class="workspace">
 <div class="workspace-head">
   <div class="head-title"><h1 id="caseTitle">Oil spill investigation</h1><span id="caseId" class="case-ref">New case</span></div>
-  <div class="head-actions"><span id="dataBadge" class="badge">No case</span><button id="btnExport" class="outline" disabled>Export evidence</button></div>
+  <div class="head-actions">
+    <label class="case-picker">Case<select id="casePicker" aria-label="Case selector"><option value="">New investigation</option><option value="demo">Arabian Sea synthetic replay</option></select></label>
+    <div class="operational-meta"><span>Mode <b id="dataBadge" class="badge">No case</b></span><span>Acquired <b id="acquisitionValue">—</b></span><span>System <b id="systemValue" class="status-text">Ready</b></span></div>
+    <button id="btnExport" class="outline" disabled>Export evidence</button>
+  </div>
 </div>
 <div id="caseSummary" class="summary-strip">Upload a georeferenced SAR image or open the sample case.</div>
 <div id="notice" class="notice" role="status" aria-live="polite" hidden><span id="noticeText"></span><button id="dismissNotice" aria-label="Dismiss message">×</button></div>
+<section class="stage-strip" aria-label="Investigation processing status">
+  <div class="stage-title"><b>Processing status</b><span id="replayClock">No acquisition loaded</span></div>
+  <ol id="stageList" class="stage-list"></ol>
+  <div id="replayControls" class="replay-controls">
+    <button id="btnReplayPause" class="map-button" disabled>Pause</button>
+    <button id="btnReplayRestart" class="map-button">Replay sample</button>
+    <label>Speed <select id="replaySpeed" aria-label="Replay speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select></label>
+  </div>
+</section>
 <main>
   <div class="map-workspace">
-    <div class="map-heading"><span><b>Investigation map</b> <small>WGS84 · UTC</small></span><div><button id="btnFit" class="map-button" disabled>Fit scene</button><label class="chk"><input type="checkbox" id="chkScene" checked> Radar layer</label></div></div>
+    <div class="map-heading"><span><b>Investigation map</b> <small>WGS84 · UTC</small></span><div class="map-tools"><button id="btnFit" class="map-button" disabled>Fit scene</button><label class="chk"><input type="checkbox" id="chkScene" checked> SAR</label><label class="chk"><input type="checkbox" id="chkEnhanced"> Contrast preview</label><label class="chk"><input type="checkbox" id="chkSlick" checked> Slick</label><label class="chk"><input type="checkbox" id="chkDriftLayers" checked> Drift</label><label class="chk"><input type="checkbox" id="chkAisLayers" checked> AIS</label></div></div>
     <div class="map-stage"><div id="map" aria-label="Oil-spill investigation map"></div>
       <div id="mapEmpty" class="map-empty"><strong>No analysis loaded</strong><p>Upload an image from the right panel or use the sample data.</p><button id="btnStartDemo" class="secondary">Use sample data</button></div>
       <details class="legend-wrap"><summary>Map legend</summary><div id="legend" class="legend"></div></details>
@@ -41,14 +54,20 @@
   </div>
   <aside id="sidebar" tabindex="-1" aria-label="Investigation controls and evidence">
     <section id="page-dashboard" class="page active">
-      <h2>New analysis</h2>
-      <p class="section-intro">Provide one georeferenced Sentinel-1 SAR image. The system reads its location and observation time from the file.</p>
+      <h2>Investigation overview</h2>
+      <p class="section-intro">Review a deterministic historical replay or provide one georeferenced Sentinel-1 SAR image. Observed inputs and modelled results remain clearly separated.</p>
+      <div class="replay-card">
+        <div><strong>Judge-ready sample</strong><span>Single-scene synthetic replay · no credentials required</span></div>
+        <button id="btnRunReplay" class="primary">Run historical replay</button>
+        <small>Replays acquisition, preprocessing, detection, drift, AIS correlation and evidence generation in sequence.</small>
+      </div>
+      <h3>Analyse another SAR scene</h3>
       <div class="image-workflow">
         <label>SAR GeoTIFF <input type="file" id="autoSceneFile" accept=".tif,.tiff"></label>
         <p class="sample-download"><a id="sampleSceneDownload" href="samples/OSI_sample_20250314.tif" download="OSI_sample_20250314.tif">Download test image</a><span>28.4 MB · synthetic</span></p>
         <button id="btnAutoRun" class="primary">Analyse image</button>
         <div id="autoProgress" class="small muted" role="status"></div>
-        <small>Runs detection, drift reconstruction, vessel matching and evidence export.</small>
+        <small>Runs detection, drift reconstruction, vessel matching and evidence export. Visual enhancement never changes the detection input.</small>
         <p class="demo-only">The public demo accepts the provided test image and replays its verified result.</p>
       </div>
       <button id="btnDemo" class="visually-hidden" tabindex="-1">Run included sample</button>
@@ -159,7 +178,7 @@
 <footer>Decision support only. Results require analyst review.<span>Offline coastline: Natural Earth</span></footer>
 </div>
 <script src="vendor/leaflet.js"></script>
-<script src="demo-data.js"></script>
+<script>window.OSI_PUBLIC_DEMO=true;</script>
 <script src="app.js"></script>
 </body>
 </html>

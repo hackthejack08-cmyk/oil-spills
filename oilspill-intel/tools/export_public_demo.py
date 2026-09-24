@@ -82,9 +82,10 @@ def main() -> None:
     )
 
     index = (OUT / "index.html").read_text(encoding="utf-8")
+    index = index.replace('/api/demo/sample-scene', 'samples/OSI_sample_20250314.tif')
     index = index.replace(
         '<script src="app.js"></script>',
-        '<script src="demo-data.js"></script>\n<script src="app.js"></script>',
+        '<script>window.OSI_PUBLIC_DEMO=true;</script>\n<script src="app.js"></script>',
     )
     (OUT / "index.html").write_text(index, encoding="utf-8")
     (OUT / "vercel.json").write_text(
@@ -98,8 +99,18 @@ def main() -> None:
                         "headers": [
                             {"key": "X-Content-Type-Options", "value": "nosniff"},
                             {"key": "Referrer-Policy", "value": "strict-origin-when-cross-origin"},
+                            {"key": "X-Frame-Options", "value": "SAMEORIGIN"},
+                            {"key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()"},
                         ],
-                    }
+                    },
+                    {
+                        "source": "/(vendor|data|renders|samples)/(.*)",
+                        "headers": [{"key": "Cache-Control", "value": "public, max-age=31536000, immutable"}],
+                    },
+                    {
+                        "source": "/demo-data.js",
+                        "headers": [{"key": "Cache-Control", "value": "public, max-age=0, must-revalidate"}],
+                    },
                 ],
             },
             indent=2,
