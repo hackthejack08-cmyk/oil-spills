@@ -11,9 +11,9 @@
 <body>
 <a class="skip-link" href="#sidebar">Skip to investigation controls</a>
 <header class="rail">
-  <div class="brand">OSI <small>Oil spill analysis</small></div>
+  <div class="brand">OSI <small>Continuous marine monitoring</small></div>
   <nav id="nav" aria-label="Investigation stages">
-    <button data-page="dashboard" class="active" aria-current="page">Overview</button>
+    <button data-page="dashboard" class="active" aria-current="page">Monitoring</button>
     <button data-page="satellite">SAR scene</button>
     <button data-page="drift">Drift</button>
     <button data-page="ais">Vessel tracks</button>
@@ -27,7 +27,7 @@
 <div class="workspace-head">
   <div class="head-title"><h1 id="caseTitle">Oil spill investigation</h1><span id="caseId" class="case-ref">New case</span></div>
   <div class="head-actions">
-    <label class="case-picker">Case<select id="casePicker" aria-label="Case selector"><option value="">New investigation</option><option value="demo">Arabian Sea investigation</option><option value="reception">Sentinel-1 acquisition</option></select></label>
+    <label class="case-picker">Area<select id="casePicker" aria-label="Monitoring area selector"><option value="">New monitoring area</option><option value="demo">Arabian Sea monitoring cycle</option><option value="reception">Sentinel-1 acquisition</option></select></label>
     <div class="operational-meta"><span>Mode <b id="dataBadge" class="badge">No case</b></span><span>Acquired <b id="acquisitionValue">—</b></span><span>System <b id="systemValue" class="status-text">Ready</b></span></div>
     <button id="btnExport" class="outline" disabled>Export evidence</button>
   </div>
@@ -35,11 +35,11 @@
 <div id="caseSummary" class="summary-strip">Upload a georeferenced SAR image or open the sample case.</div>
 <div id="notice" class="notice" role="status" aria-live="polite" hidden><span id="noticeText"></span><button id="dismissNotice" aria-label="Dismiss message">×</button></div>
 <section class="stage-strip" aria-label="Investigation processing status">
-  <div class="stage-title"><b>Processing status</b><span id="replayClock">No acquisition loaded</span></div>
+  <div class="stage-title"><b>Monitoring cycle</b><span id="replayClock">Waiting for acquisitions</span></div>
   <ol id="stageList" class="stage-list"></ol>
   <div id="replayControls" class="replay-controls">
     <button id="btnReplayPause" class="map-button" disabled>Pause</button>
-    <button id="btnReplayRestart" class="map-button">Replay sample</button>
+    <button id="btnReplayRestart" class="map-button">Scan now</button>
     <label>Speed <select id="replaySpeed" aria-label="Replay speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select></label>
   </div>
   <div class="acquisition-track" aria-hidden="true"><i id="acquisitionProgress"></i></div>
@@ -48,16 +48,16 @@
   <div class="map-workspace">
     <div class="map-heading"><span><b>Investigation map</b> <small>WGS84 · UTC</small></span><div class="map-tools"><button id="btnFit" class="map-button" disabled>Fit scene</button><label class="chk"><input type="checkbox" id="chkScene" checked> SAR</label><label class="chk"><input type="checkbox" id="chkEnhanced"> Contrast preview</label><label class="chk"><input type="checkbox" id="chkSlick" checked> Slick</label><label class="chk"><input type="checkbox" id="chkDriftLayers" checked> Drift</label><label class="chk"><input type="checkbox" id="chkAisLayers" checked> AIS</label></div></div>
     <div class="map-stage"><div id="map" aria-label="Oil-spill investigation map"></div>
-      <div id="mapEmpty" class="map-empty"><strong>Ready</strong><div class="map-start-actions"><button id="btnStartDemo" class="primary">Run investigation</button><button id="btnReceiveMap" class="secondary">Receive SAR sample</button></div></div>
+      <div id="mapEmpty" class="map-empty"><strong>Area monitor ready</strong><div class="map-start-actions"><button id="btnStartDemo" class="primary">Scan available scenes</button><button id="btnReceiveMap" class="secondary">Receive SAR sample</button></div></div>
       <details class="legend-wrap"><summary>Map legend</summary><div id="legend" class="legend"></div></details>
     </div>
     <section class="case-bottom" aria-label="Candidate overview"><div class="section-heading"><h2>Candidate vessels</h2><span class="muted small">Evidence match ≠ responsibility</span></div><div id="candidateOverview" class="table-scroll"><p class="empty-note">Candidates appear after satellite analysis, drift modelling and AIS correlation.</p></div></section>
   </div>
   <aside id="sidebar" tabindex="-1" aria-label="Investigation controls and evidence">
     <section id="page-dashboard" class="page active">
-      <div class="operation-head"><span>Operations</span><b id="operationState">Ready</b></div>
+      <div class="operation-head"><span>Monitoring</span><b id="operationState">Ready</b></div>
       <div class="operation-card">
-        <button id="btnRunReplay" class="primary">Run investigation</button>
+        <button id="btnRunReplay" class="primary">Scan available scenes</button>
         <button id="btnReceiveSample" class="secondary">Receive real SAR sample</button>
         <div class="sample-meta">
           <span><b>Sentinel-1A</b> · IW GRD</span>

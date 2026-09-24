@@ -4,8 +4,8 @@ window.S = S;
 const $ = (q) => document.querySelector(q);
 const esc = (x) => String(x ?? "").replace(/[<>&"']/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&#39;" }[c]));
 const PIPELINE_STAGES = [
-  ["acquisition", "SAR acquired"], ["preprocessing", "Preprocessed"], ["detection", "Slick detection"],
-  ["drift", "Drift model"], ["ais", "AIS correlation"], ["evidence", "Evidence"],
+  ["acquisition", "New scenes"], ["preprocessing", "SAR processed"], ["detection", "Slicks detected"],
+  ["drift", "Drift forecast"], ["ais", "Vessel correlation"], ["evidence", "Alerts"],
 ];
 const REAL_SAR_SAMPLE = {
   id: "S1A_IW_GRDH_1SDV_20190616T140738_20190616T140803_027706_03209B",
@@ -342,15 +342,16 @@ function kpis() {
   const d = S.detection, dr = S.drift, a = S.ais; const top = a && a.candidates[0];
   const h = dr && dr.backward.hypotheses[3];
   $("#kpis").innerHTML = S.inv ? [
-    ["Investigation", S.inv ? S.inv.id : "–"], ["Scene", S.scene ? (S.scene.sensing_time || "").slice(0, 16) : "–"],
+    ["Scenes scanned", S.scene ? "1" : "0"], ["Latest scene", S.scene ? (S.scene.sensing_time || "").slice(0, 16) : "–"],
+    ["Slicks detected", S.scene ? String(S.scene.detections?.length || 0) : "–"],
     ["Oil-likelihood score (uncalibrated)", d ? fmt(d.oil_likelihood) : "–"], ["Area", d ? fmt(d.geometry.area_km2, 2) + " km²" : "–"],
     ["Centroid", d ? `${fmt(d.geometry.centroid_lat, 3)}, ${fmt(d.geometry.centroid_lon, 3)}` : "–"],
     ["Origin (4 h hyp.)", h ? `${fmt(h.centre[1], 3)}, ${fmt(h.centre[0], 3)} ±${fmt(h.spread_km, 1)} km` : "–"],
     ["Candidate vessels", a ? `${a.n_candidates} / ${a.n_vessels_total}` : "–"], ["Top match / 100", top ? `${top.name} (${(top.correlation * 100).toFixed(0)})` : "–"],
   ].map(([k, v]) => `<div class="kpi"><b>${esc(v)}</b><span>${esc(k)}</span></div>`).join("") : "";
   $("#timelineHeading").hidden = !S.inv;
-  $("#caseTitle").textContent = S.inv?.name || "Oil spill investigation";
-  $("#caseId").textContent = S.inv ? S.inv.id : "New case";
+  $("#caseTitle").textContent = S.inv?.mode === "demo" ? "Arabian Sea continuous monitor" : S.inv?.name || "Oil spill monitoring";
+  $("#caseId").textContent = S.inv?.mode === "demo" ? "Monitoring area · latest cycle" : S.inv ? S.inv.id : "New area";
   const isReception = S.inv?.mode === "sar-reception";
   $("#dataBadge").textContent = S.inv ? isReception ? "Real SAR" : S.scene?.synthetic || S.ais?.synthetic ? "Synthetic data" : S.inv.mode === "demo" ? "Demo data" : "Operational data" : "No case";
   $("#dataBadge").classList.toggle("la", S.inv?.mode === "demo");
@@ -368,7 +369,8 @@ function kpis() {
     `<b>Historic measured SAR</b>`
   ].map((s) => `<span>${s}</span>`).join("") : S.inv ? [
     `Observed <b>${esc(S.scene?.sensing_time?.replace("T", " ") || "No scene loaded")}</b>`,
-    `Suspected area <b>${d ? fmt(d.geometry.area_km2) + " km²" : "—"}</b>`,
+    `Scenes scanned <b>${S.scene ? "1" : "0"}</b>`,
+    `Slicks detected <b>${S.scene?.detections?.length || 0}</b>`,
     `Detector <b>${esc(S.scene?.detector || "Not run")}</b>`,
     '<b>Unconfirmed · analyst review required</b>'
   ].map((s) => `<span>${s}</span>`).join("") : "Choose an operation to begin.";
@@ -534,7 +536,10 @@ function runReplayStage() {
       $("#acquisitionProgress").style.width = `${(replay.index / PIPELINE_STAGES.length) * 100}%`;
       if (replay.index >= PIPELINE_STAGES.length) {
         replay.active = false; $("#btnReplayPause").disabled = true; $("#btnReplayPause").textContent = "Pause";
-        notify("Investigation complete. Candidate scores require analyst review.");
+        const slicks = S.scene?.detections?.length || 0;
+        $("#systemValue").textContent = "Watching"; $("#operationState").textContent = "Watching";
+        $("#replayClock").textContent = `Cycle complete · 1 scene · ${slicks} slicks · next catalogue check 15 min`;
+        notify(`Monitoring cycle complete. ${slicks} suspected slicks require analyst review.`);
       } else runReplayStage();
     } catch (error) {
       replay.active = false; setStage(id, "failed"); notify(error.message, true);
@@ -544,7 +549,7 @@ function runReplayStage() {
 async function startHistoricalReplay() {
   stopReplayActivity(); replay.kind = "investigation";
   $("#btnRunReplay").disabled = true; $("#btnStartDemo").disabled = true; $("#btnReplayRestart").disabled = true;
-  notify("Loading the deterministic synthetic replay…");
+  notify("Scanning available Sentinel-1 scenes…");
   try {
     const result = await api("/api/demo/run", {});
     resetResults(); resetStages();

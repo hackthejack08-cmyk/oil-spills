@@ -33,7 +33,7 @@ SAS = "https://planetarycomputer.microsoft.com/api/sas/v1/token/sentinel-1-grd"
 
 def search(lon: float, lat: float, start: str, end: str, top: int = 10, bbox=None) -> list[dict]:
     geom = {"type": "Point", "coordinates": [lon, lat]}
-    body = {"collections": ["sentinel-1-grd"], "datetime": f"{start}/{end}", "limit": top, "sortby": [{"field": "datetime", "direction": "desc"}]}
+    body = {"collections": ["sentinel-1-grd"], "datetime": f"{start}/{end}", "limit": min(top * 2, 100), "sortby": [{"field": "datetime", "direction": "desc"}]}
     if bbox:
         body["bbox"] = list(bbox)
     else:
@@ -58,7 +58,14 @@ def search(lon: float, lat: float, start: str, end: str, top: int = 10, bbox=Non
                     "assets": {k: v["href"] for k, v in f["assets"].items() if k in ("vv", "vh", "schema-calibration-vv", "schema-calibration-vh",
                                                                                        "schema-noise-vv", "schema-noise-vh", "schema-product-vv", "schema-product-vh", "rendered_preview")},
                     "source": "planetary_computer"})
-    return out
+    # Planetary Computer can expose both a shortened and complete SAFE id for the same pass.
+    # Keep the complete id so one acquisition is never processed twice.
+    unique = {}
+    for product in out:
+        key = (product["sensing_start"], product["platform"], product["orbit_direction"], tuple(product.get("polarisation") or ()))
+        if key not in unique or len(product["id"]) > len(unique[key]["id"]):
+            unique[key] = product
+    return sorted(unique.values(), key=lambda product: product["sensing_start"] or "", reverse=True)[:top]
 
 
 def item(item_id: str) -> dict:

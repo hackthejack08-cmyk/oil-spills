@@ -53,6 +53,11 @@ CREATE TABLE IF NOT EXISTS vessel_correlations (
 CREATE INDEX IF NOT EXISTS ix_corr_inv ON vessel_correlations(investigation_id, rank);
 CREATE TABLE IF NOT EXISTS evidence (
   id TEXT PRIMARY KEY, investigation_id TEXT, kind TEXT, ref_id TEXT, payload TEXT, sha256 TEXT, created_at TEXT);
+CREATE TABLE IF NOT EXISTS monitor_products (
+  monitor_id TEXT, product_id TEXT, investigation_id TEXT REFERENCES investigations(id), sensing_time TEXT,
+  status TEXT, bbox TEXT, result TEXT, error TEXT, created_at TEXT,
+  PRIMARY KEY (monitor_id, product_id));
+CREATE INDEX IF NOT EXISTS ix_monitor_time ON monitor_products(monitor_id, sensing_time);
 CREATE TABLE IF NOT EXISTS system_logs (
   id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, level TEXT, investigation_id TEXT, message TEXT);
 """

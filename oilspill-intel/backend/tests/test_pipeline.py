@@ -35,6 +35,30 @@ def test_lookalike_rules():
     b = lookalike.assess(0.8, mean_contrast_db=4.0, elongation=6.0, area_km2=5, touches_land=False, wind_ms=6)
     assert b.label == "probable_oil" and not b.penalties
 
+
+def test_monitoring_keeps_multiple_slicks_and_links_repeat_passes():
+    from app.monitoring import cluster_events
+    base = {"area_km2": 2.0, "score": 0.7, "label": "probable_oil"}
+    events = [
+        base | {"detection_id": "a", "product_id": "scene-1", "sensing_time": "2026-01-01T00:00:00Z", "lat": 19.0, "lon": 72.0},
+        base | {"detection_id": "b", "product_id": "scene-1", "sensing_time": "2026-01-01T00:00:00Z", "lat": 19.01, "lon": 72.01},
+        base | {"detection_id": "c", "product_id": "scene-2", "sensing_time": "2026-01-02T00:00:00Z", "lat": 19.005, "lon": 72.005},
+    ]
+    incidents = cluster_events(events)
+    assert len(incidents) == 2
+    assert sorted(len(incident["events"]) for incident in incidents) == [1, 2]
+
+
+def test_monitor_scan_queues_an_idempotent_cycle(monkeypatch):
+    from app import jobs
+    queued = {}
+    monkeypatch.setattr(jobs, "submit", lambda kind, fn, body: queued.update(kind=kind, body=body) or {"id": "job_monitor"})
+    payload = {"monitor_id": "mumbai-coast", "bbox": [72.2, 18.6, 73.0, 19.5],
+               "start": "2025-03-01T00:00:00Z", "end": "2025-03-31T23:59:59Z"}
+    response = client.post("/api/data/monitor/scan", json=payload)
+    assert response.status_code == 200 and response.json()["id"] == "job_monitor"
+    assert queued["kind"] == "sentinel1_monitor" and queued["body"].monitor_id == "mumbai-coast"
+
 def test_ais_cleaning_drops_junk():
     raw = aisp.load_csv(str(config.DEMO_DIR / "synthetic_ais.csv"))
     clean, rep = aisp.clean(raw)

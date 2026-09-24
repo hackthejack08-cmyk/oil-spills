@@ -12,7 +12,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from .. import config, jobs, pipeline
+from .. import config, jobs, monitoring, pipeline
 from ..integrations import cdse, planetary, s1_calibrate, metocean, ais_sources
 
 router = APIRouter(prefix="/api/data", tags=["data-sources"])
@@ -118,6 +118,68 @@ def s1_fetch(b: S1Fetch):
     if not os.getenv("OSI_CDSE_USER"):
         raise HTTPException(401, "CDSE download needs OSI_CDSE_USER / OSI_CDSE_PASSWORD (free account) – or use provider=planetary (no account)")
     return jobs.submit("sentinel1_fetch", _fetch_and_calibrate_cdse, b.product_id, b.downsample, b.bbox)
+
+
+class MonitorScan(BaseModel):
+    monitor_id: str = Field("arabian-sea", min_length=2, max_length=60, pattern=r"^[a-z0-9][a-z0-9-]+$")
+    bbox: list[float] = Field(..., min_length=4, max_length=4)
+    start: str
+    end: str
+    max_products: int = Field(12, ge=1, le=50)
+    downsample: int = Field(8, ge=2, le=16)
+    min_score: float = Field(0.65, ge=0, le=1)
+
+
+def _scan_monitor(body: MonitorScan, progress):
+    centre_lon = (body.bbox[0] + body.bbox[2]) / 2
+    centre_lat = (body.bbox[1] + body.bbox[3]) / 2
+    products = planetary.search(centre_lon, centre_lat, body.start, body.end, body.max_products, bbox=body.bbox)
+    processed = skipped = 0
+    errors = []
+    for index, product in enumerate(reversed(products), 1):
+        progress(index - 1, max(len(products), 1), f"checking {product['id']}")
+        if not monitoring.claim_product(body.monitor_id, product):
+            skipped += 1
+            continue
+        investigation = None
+        try:
+            fetched = _fetch_and_calibrate_pc(product["id"], body.downsample, body.bbox, lambda *_: None)
+            investigation = pipeline.create_investigation(
+                f"Monitor {body.monitor_id} · {product['sensing_start'][:16]}", "real", "continuous Sentinel-1 area scan"
+            )
+            scene = pipeline.analyze_scene(
+                investigation["id"], fetched["path"], sensing_time=product["sensing_start"]
+            )
+            monitoring.finish_product(body.monitor_id, product["id"], investigation["id"], scene)
+            processed += 1
+        except Exception as exc:
+            message = f"{type(exc).__name__}: {exc}"
+            monitoring.finish_product(body.monitor_id, product["id"], investigation and investigation["id"], error=message)
+            errors.append({"product_id": product["id"], "error": message})
+    progress(len(products), max(len(products), 1), "monitoring cycle complete")
+    return monitoring.summary(body.monitor_id, body.min_score) | {
+        "catalogue_matches": len(products), "newly_processed": processed, "already_processed": skipped,
+        "errors": errors, "source": "Microsoft Planetary Computer Sentinel-1 GRD",
+    }
+
+
+@router.post("/monitor/scan")
+def monitor_scan(body: MonitorScan):
+    """Idempotent monitoring cycle: discover every new product, analyse all slicks, then group repeat detections."""
+    if body.bbox[0] >= body.bbox[2] or body.bbox[1] >= body.bbox[3]:
+        raise HTTPException(400, "bbox must be [minlon,minlat,maxlon,maxlat]")
+    if (body.bbox[2] - body.bbox[0]) * (body.bbox[3] - body.bbox[1]) > 4:
+        raise HTTPException(400, "monitoring AOI must be 4 deg² or smaller")
+    if _iso(body.start) >= _iso(body.end):
+        raise HTTPException(400, "start must be before end")
+    return jobs.submit("sentinel1_monitor", _scan_monitor, body)
+
+
+@router.get("/monitor/{monitor_id}")
+def monitor_summary(monitor_id: str, min_score: float = 0.65):
+    if not monitor_id.replace("-", "").isalnum():
+        raise HTTPException(400, "invalid monitor id")
+    return monitoring.summary(monitor_id, min_score)
 
 
 class S1Local(BaseModel):

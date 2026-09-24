@@ -1,8 +1,8 @@
 # OSI — Oil Spill Intelligence (SIH26143 · NTRO)
 
-One georeferenced SAR image → segmentation → geometry → environmental forcing → backward/forward drift → configured AIS matching → explainable evidence dashboard.
+Continuous Sentinel-1 catalogue watch → every new AOI image → multiple-slick segmentation → cross-pass incident grouping → drift → configured AIS matching → explainable alerts.
 
-The user-facing path needs only one Sentinel-1 GeoTIFF. The server reads location and capture time from the image, fetches currents/wind, and uses authorized historical AIS when the deployment has it. The included synthetic sample runs the entire chain offline.
+The monitor deduplicates catalogue product IDs, processes every new AOI acquisition, retains multiple slicks from one image and links repeat-pass detections into incidents. A one-image upload remains available for ad-hoc review. See `docs/CONTINUOUS_MONITORING.md`.
 
 **Public SIH judge demo:** https://public-demo-one.vercel.app — read-only bundled synthetic case. The full FastAPI build below enables real uploads/connectors and must be secured before operational deployment.
 

@@ -11,7 +11,7 @@ import pytest
 import xarray as xr
 
 from app import jobs
-from app.integrations import ais_sources, cdse, metocean
+from app.integrations import ais_sources, cdse, metocean, planetary
 
 LIVE = os.getenv("OSI_LIVE_TESTS") == "1"
 
@@ -113,6 +113,22 @@ def test_cdse_download_requires_credentials(monkeypatch, tmp_path):
     monkeypatch.delenv("OSI_CDSE_USER", raising=False)
     with pytest.raises(PermissionError, match="OSI_CDSE_USER"):
         cdse._token()
+
+
+def test_planetary_search_deduplicates_one_acquisition(monkeypatch):
+    def feature(product_id):
+        return {"id": product_id, "bbox": [72, 18, 73, 19], "geometry": None, "assets": {}, "properties": {
+            "datetime": "2025-03-20T01:03:35Z", "sar:instrument_mode": "IW", "sat:orbit_state": "ascending",
+            "sar:polarizations": ["VV", "VH"], "platform": "sentinel-1a",
+        }}
+    short = "S1A_IW_GRDH_1SDV_20250320T010323_20250320T010348_058381"
+    full = short + "_073817"
+    class Response:
+        def raise_for_status(self): pass
+        def json(self): return {"features": [feature(short), feature(full)]}
+    monkeypatch.setattr(planetary.requests, "post", lambda *args, **kwargs: Response())
+    products = planetary.search(72.6, 18.9, "2025-03-01T00:00:00Z", "2025-03-31T00:00:00Z", bbox=[72, 18, 73, 19])
+    assert [product["id"] for product in products] == [full]
 
 
 # ---------------------------------------------------------------- live (opt-in)
