@@ -42,7 +42,7 @@ def main() -> None:
         project_file.write_text(project_link, encoding="utf-8")
     (OUT / "data").mkdir()
     (OUT / "renders").mkdir()
-    (OUT / "samples").mkdir()
+    (OUT / "samples").mkdir(exist_ok=True)
     shutil.copy2(ROOT / "demo" / "data" / "ne_110m_coastline.geojson", OUT / "data" / "coastline.geojson")
     shutil.copy2(ROOT / "demo" / "data" / "synthetic_s1_scene.tif", OUT / "samples" / "OSI_sample_20250314.tif")
 

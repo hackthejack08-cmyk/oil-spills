@@ -12,7 +12,8 @@ def main() -> None:
     app = (PUBLIC / "app.js").read_text(encoding="utf-8")
     required_ids = {
         "casePicker", "stageList", "btnRunReplay", "btnReplayPause",
-        "btnReplayRestart", "replaySpeed", "chkEnhanced", "chkSlick",
+        "btnReplayRestart", "replaySpeed", "btnReceiveSample", "btnReceiveMap",
+        "acquisitionProgress", "chkEnhanced", "chkSlick",
         "chkDriftLayers", "chkAisLayers", "btnExport",
     }
     missing = sorted(element_id for element_id in required_ids if f'id="{element_id}"' not in html)
@@ -22,6 +23,8 @@ def main() -> None:
     assert "startHistoricalReplay" in app, "deterministic replay is not wired"
     assert (PUBLIC / "demo-data.js").is_file(), "bundled replay data is missing"
     assert (PUBLIC / "samples" / "OSI_sample_20250314.tif").is_file(), "judge sample is missing"
+    assert (PUBLIC / "samples" / "S1A_IW_20190616_140738_real_sample.tif").is_file(), "real SAR sample is missing"
+    assert (PUBLIC / "samples" / "S1A_IW_20190616_140738_quicklook.png").is_file(), "SAR quicklook is missing"
     assert (ROOT / "frontend" / "static" / "app.js").read_bytes() == (PUBLIC / "app.js").read_bytes(), "public app.js is stale"
     assert (ROOT / "frontend" / "static" / "app.css").read_bytes() == (PUBLIC / "app.css").read_bytes(), "public app.css is stale"
     print("Public demo check passed: controls, lazy replay data, assets, and source sync are valid.")

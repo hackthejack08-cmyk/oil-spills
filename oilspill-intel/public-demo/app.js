@@ -7,8 +7,16 @@ const PIPELINE_STAGES = [
   ["acquisition", "SAR acquired"], ["preprocessing", "Preprocessed"], ["detection", "Slick detection"],
   ["drift", "Drift model"], ["ais", "AIS correlation"], ["evidence", "Evidence"],
 ];
+const REAL_SAR_SAMPLE = {
+  id: "S1A_IW_GRDH_1SDV_20190616T140738_20190616T140803_027706_03209B",
+  start: "2019-06-16T14:07:38Z",
+  stop: "2019-06-16T14:08:03Z",
+  durationS: 25,
+  bbox: [59.45519693247744, 22.671491235118914, 60.51277339248815, 23.723201581643035],
+  quicklook: "samples/S1A_IW_20190616_140738_quicklook.png",
+};
 const stageState = Object.fromEntries(PIPELINE_STAGES.map(([id]) => [id, "waiting"]));
-const replay = { result: null, index: -1, timer: null, paused: false, active: false };
+const replay = { result: null, index: -1, timer: null, frame: null, paused: false, active: false, kind: null, elapsedMs: 0, lastFrame: 0 };
 function notify(message, error = false) {
   $("#noticeText").textContent = message; $("#notice").hidden = false;
   $("#notice").classList.toggle("error", error);
@@ -18,9 +26,10 @@ function renderStageStatus() {
   $("#stageList").innerHTML = PIPELINE_STAGES.map(([id, label]) => `<li class="${stageState[id]}" aria-label="${esc(label)}: ${stageState[id]}">${esc(label)}</li>`).join("");
   const values = Object.values(stageState);
   $("#systemValue").textContent = values.includes("failed") ? "Review required" : values.includes("running") ? "Processing" : values.includes("partial") ? "Partial" : values.every((v) => v === "complete") ? "Complete" : "Ready";
+  if ($("#operationState")) $("#operationState").textContent = $("#systemValue").textContent;
 }
 function setStage(id, status) { stageState[id] = status; renderStageStatus(); }
-function resetStages() { PIPELINE_STAGES.forEach(([id]) => { stageState[id] = "waiting"; }); renderStageStatus(); }
+function resetStages() { PIPELINE_STAGES.forEach(([id]) => { stageState[id] = "waiting"; }); $("#acquisitionProgress").style.width = "0%"; renderStageStatus(); }
 function completeAvailableStages() {
   if (S.scene) { setStage("acquisition", "complete"); setStage("preprocessing", "complete"); setStage("detection", S.scene.detections?.length ? "complete" : "partial"); }
   if (S.drift) setStage("drift", "complete");
@@ -48,7 +57,7 @@ const publicDemoApi = async (path) => {
   if (path.startsWith("/api/investigations/")) return data.case;
   if (path.startsWith("/api/vessels/")) return data.vessels[path.split("/")[3].split("?")[0]];
   if (path.startsWith("/api/evidence/")) return data.evidence;
-  throw new Error("This action needs the full FastAPI deployment. The public link contains the validated judge demo.");
+  throw new Error("This action needs the full analysis service.");
 };
 const api = async (path, body, method) => {
   if (window.OSI_PUBLIC_DEMO) return publicDemoApi(path);
@@ -297,7 +306,7 @@ window.showVessel = async (mmsi) => {
     <div class="card"><h4>3 · Drift evidence</h4>Origin window ${S.drift.origin_window.earliest.slice(0, 16)}Z → ${S.drift.origin_window.latest.slice(0, 16)}Z · best-matching age ${c ? c.best_age_hours : "–"} h → cloud centre ${h ? fmt(h.centre[1], 3) + ", " + fmt(h.centre[0], 3) : ""} ±${h ? fmt(h.spread_km, 1) : ""} km (1σ) · engine ${S.drift.params.engine}</div>
     <div class="card"><h4>4 · AIS evidence</h4>${v.trajectory.n_fixes} fixes ${v.trajectory.t_start.slice(0, 16)}Z → ${v.trajectory.t_end.slice(0, 16)}Z · gaps: ${v.trajectory.gaps.length ? v.trajectory.gaps.map((x) => `${x.minutes} min @ ${x.start.slice(0, 16)}Z`).join(", ") : "none"}</div>
     ${c ? `<div class="card"><h4>5 · Score breakdown</h4>${c.evidence.map((e) => `<div class="ev"><span>${esc(e.name)} <span class="muted">w=${e.weight}</span></span><div class="bar"><i style="width:${e.score * 100}%"></i></div><span>${(e.score * 100).toFixed(0)}%</span><span class="muted small" style="grid-column:1/4">${esc(e.explanation)}</span></div>`).join("")}</div>
-    <div class="card"><h4>6 · Uncertainty & limitations</h4><ul class="small">${[...c.limitations, "Optical validation is not implemented in this prototype", "Origin position uncertainty grows with age hypothesis (see ellipses)", "Spill age not observable from one scene → window, not instant", "Scores are rule-based v1 weights; not calibrated on labelled incidents"].map((l) => `<li>${esc(l)}</li>`).join("")}</ul></div>` : ""}`;
+    <div class="card"><h4>6 · Uncertainty & limitations</h4><ul class="small">${[...c.limitations, "Optical validation is not implemented", "Origin position uncertainty grows with age hypothesis (see ellipses)", "Spill age not observable from one scene → window, not instant", "Scores are rule-based v1 weights; not calibrated on labelled incidents"].map((l) => `<li>${esc(l)}</li>`).join("")}</ul></div>` : ""}`;
   } catch (e) { notify(e.message, true); }
 };
 async function loadLedger() {
@@ -342,19 +351,27 @@ function kpis() {
   $("#timelineHeading").hidden = !S.inv;
   $("#caseTitle").textContent = S.inv?.name || "Oil spill investigation";
   $("#caseId").textContent = S.inv ? S.inv.id : "New case";
-  $("#dataBadge").textContent = S.inv ? S.scene?.synthetic || S.ais?.synthetic ? "Synthetic data" : S.inv.mode === "demo" ? "Demo data" : "Operational data" : "No case";
+  const isReception = S.inv?.mode === "sar-reception";
+  $("#dataBadge").textContent = S.inv ? isReception ? "Real SAR" : S.scene?.synthetic || S.ais?.synthetic ? "Synthetic data" : S.inv.mode === "demo" ? "Demo data" : "Operational data" : "No case";
   $("#dataBadge").classList.toggle("la", S.inv?.mode === "demo");
+  $("#dataBadge").classList.toggle("oil", isReception);
   $("#acquisitionValue").textContent = S.scene?.sensing_time ? S.scene.sensing_time.slice(0, 16).replace("T", " ") + "Z" : "—";
   if (S.inv?.mode === "demo") $("#casePicker").value = "demo";
+  if (isReception) $("#casePicker").value = "reception";
   $("#mapEmpty").hidden = Boolean(S.inv);
   $("#btnFit").disabled = !S.scene;
-  $("#btnExport").disabled = !S.inv;
-  $("#caseSummary").innerHTML = S.inv ? [
+  $("#btnExport").disabled = !S.inv || isReception;
+  $("#caseSummary").innerHTML = isReception ? [
+    `Sentinel-1A <b>IW GRD</b>`,
+    `Acquisition <b>${REAL_SAR_SAMPLE.start.slice(0, 19).replace("T", " ")} UTC</b>`,
+    `Slice <b>${REAL_SAR_SAMPLE.durationS} seconds</b>`,
+    `<b>Historic measured SAR</b>`
+  ].map((s) => `<span>${s}</span>`).join("") : S.inv ? [
     `Observed <b>${esc(S.scene?.sensing_time?.replace("T", " ") || "No scene loaded")}</b>`,
     `Suspected area <b>${d ? fmt(d.geometry.area_km2) + " km²" : "—"}</b>`,
     `Detector <b>${esc(S.scene?.detector || "Not run")}</b>`,
     '<b>Unconfirmed · analyst review required</b>'
-  ].map((s) => `<span>${s}</span>`).join("") : "Upload a georeferenced SAR image or open the sample case.";
+  ].map((s) => `<span>${s}</span>`).join("") : "Choose an operation to begin.";
   renderCandidates();
 }
 
@@ -437,6 +454,52 @@ function replayTime(label) {
   const observed = replay.result?.scene?.sensing_time?.slice(0, 16).replace("T", " ");
   $("#replayClock").textContent = observed ? `${label} · acquisition ${observed}Z` : label;
 }
+function stopReplayActivity() {
+  clearTimeout(replay.timer);
+  if (replay.frame) cancelAnimationFrame(replay.frame);
+  replay.timer = replay.frame = null;
+  replay.active = false;
+}
+function setReceptionReveal(fraction) {
+  const image = layers.scene?.getElement?.() || layers.scene?._image;
+  if (!image) return;
+  image.classList.add("sar-reception");
+  image.style.clipPath = `inset(0 0 ${(100 - fraction * 100).toFixed(2)}% 0)`;
+}
+function receiveFrame(now) {
+  if (!replay.active || replay.kind !== "reception") return;
+  if (!replay.lastFrame) replay.lastFrame = now;
+  if (!replay.paused) replay.elapsedMs += Math.min(now - replay.lastFrame, 250) * Number($("#replaySpeed").value || 1);
+  replay.lastFrame = now;
+  const fraction = Math.min(1, replay.elapsedMs / (REAL_SAR_SAMPLE.durationS * 1000));
+  setReceptionReveal(fraction);
+  $("#acquisitionProgress").style.width = `${fraction * 100}%`;
+  $("#replayClock").textContent = replay.paused ? `Reception paused · ${Math.round(fraction * 100)}%` : `Receiving Sentinel-1 · ${Math.round(fraction * 100)}% · ${(replay.elapsedMs / 1000).toFixed(1)} / ${REAL_SAR_SAMPLE.durationS}s`;
+  if (fraction >= 1) {
+    replay.active = false; replay.frame = null; setStage("acquisition", "complete");
+    $("#systemValue").textContent = "Received"; $("#operationState").textContent = "Received";
+    $("#btnReplayPause").disabled = true; $("#btnReplayPause").textContent = "Pause";
+    $("#replayClock").textContent = `Product received · ${REAL_SAR_SAMPLE.durationS}s slice`;
+    notify("Sentinel-1 IW product slice received.");
+    return;
+  }
+  replay.frame = requestAnimationFrame(receiveFrame);
+}
+function startRealReception() {
+  stopReplayActivity(); resetResults(); resetStages();
+  replay.kind = "reception"; replay.paused = false; replay.elapsedMs = 0; replay.lastFrame = 0;
+  S.inv = { id: "S1A-20190616-140738", name: "Sentinel-1 acquisition", mode: "sar-reception" };
+  S.scene = {
+    bbox: REAL_SAR_SAMPLE.bbox, quicklook: REAL_SAR_SAMPLE.quicklook, prob_overlay: null,
+    sensing_time: REAL_SAR_SAMPLE.start, detector: "not processed", processing_s: 0,
+    synthetic: false, detections: [], age_estimate: { status: "not estimated", reason: "acquisition only" },
+  };
+  S.detection = null; renderScene(); kpis(); goto("dashboard");
+  setReceptionReveal(0); setStage("acquisition", "running");
+  $("#casePicker").value = "reception"; $("#btnReplayPause").disabled = false; $("#btnReplayPause").textContent = "Pause";
+  $("#btnReplayRestart").textContent = "Restart";
+  replay.active = true; replay.frame = requestAnimationFrame(receiveFrame);
+}
 async function revealReplayStage(id) {
   const r = replay.result;
   if (id === "acquisition") {
@@ -459,17 +522,19 @@ async function revealReplayStage(id) {
   }
 }
 function runReplayStage() {
-  if (!replay.active || replay.paused) return;
+  if (!replay.active || replay.paused || replay.kind !== "investigation") return;
   const entry = PIPELINE_STAGES[replay.index];
   if (!entry) return;
   const [id, label] = entry; setStage(id, "running"); replayTime(label);
+  $("#acquisitionProgress").style.width = `${(replay.index / PIPELINE_STAGES.length) * 100}%`;
   clearTimeout(replay.timer);
   replay.timer = setTimeout(async () => {
     try {
       await revealReplayStage(id); setStage(id, "complete"); replay.index += 1;
+      $("#acquisitionProgress").style.width = `${(replay.index / PIPELINE_STAGES.length) * 100}%`;
       if (replay.index >= PIPELINE_STAGES.length) {
         replay.active = false; $("#btnReplayPause").disabled = true; $("#btnReplayPause").textContent = "Pause";
-        notify("Replay complete. Results are a synthetic investigation aid—not proof of pollution or vessel responsibility.");
+        notify("Investigation complete. Candidate scores require analyst review.");
       } else runReplayStage();
     } catch (error) {
       replay.active = false; setStage(id, "failed"); notify(error.message, true);
@@ -477,7 +542,7 @@ function runReplayStage() {
   }, replayDelay());
 }
 async function startHistoricalReplay() {
-  clearTimeout(replay.timer); replay.active = false;
+  stopReplayActivity(); replay.kind = "investigation";
   $("#btnRunReplay").disabled = true; $("#btnStartDemo").disabled = true; $("#btnReplayRestart").disabled = true;
   notify("Loading the deterministic synthetic replay…");
   try {
@@ -486,6 +551,7 @@ async function startHistoricalReplay() {
     replay.result = result; replay.index = 0; replay.paused = false; replay.active = true;
     S.inv = result.investigation; $("#casePicker").value = "demo"; kpis(); goto("dashboard");
     $("#btnReplayPause").disabled = false; $("#btnReplayPause").textContent = "Pause";
+    $("#btnReplayRestart").textContent = "Restart";
     runReplayStage();
   } catch (error) { notify(error.message, true); }
   finally { $("#btnRunReplay").disabled = false; $("#btnStartDemo").disabled = false; $("#btnReplayRestart").disabled = false; }
@@ -493,10 +559,16 @@ async function startHistoricalReplay() {
 $("#btnReplayPause").onclick = () => {
   if (!replay.active) return;
   replay.paused = !replay.paused; $("#btnReplayPause").textContent = replay.paused ? "Resume" : "Pause";
+  if (replay.kind === "reception") {
+    replay.lastFrame = performance.now();
+    if (!replay.frame) replay.frame = requestAnimationFrame(receiveFrame);
+    return;
+  }
   clearTimeout(replay.timer);
   if (replay.paused) replayTime("Replay paused"); else runReplayStage();
 };
 $("#replaySpeed").onchange = () => {
+  if (replay.kind === "reception") return;
   if (!replay.active || replay.paused) return;
   clearTimeout(replay.timer); runReplayStage();
 };
@@ -506,7 +578,9 @@ $("#btnDemo").onclick = async () => {
 };
 $("#btnStartDemo").onclick = startHistoricalReplay;
 $("#btnRunReplay").onclick = startHistoricalReplay;
-$("#btnReplayRestart").onclick = startHistoricalReplay;
+$("#btnReceiveSample").onclick = startRealReception;
+$("#btnReceiveMap").onclick = startRealReception;
+$("#btnReplayRestart").onclick = () => replay.kind === "reception" ? startRealReception() : startHistoricalReplay();
 $("#btnFit").onclick = () => S.scene && map.fitBounds([[S.scene.bbox[1], S.scene.bbox[0]], [S.scene.bbox[3], S.scene.bbox[2]]]);
 $("#chkScene").onchange = () => layers.scene?.setOpacity($("#chkScene").checked ? 0.85 : 0);
 function setGroupVisibility(keys, visible) {
@@ -535,7 +609,7 @@ $("#btnExport").onclick = async () => {
       const blob = new Blob([JSON.stringify(window.OSI_DEMO_DATA.evidence, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob); const a = document.createElement("a");
       a.href = url; a.download = `${inv.id}-evidence.json`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-      notify("Evidence JSON exported from the bundled judge case."); return;
+      notify("Evidence JSON exported."); return;
     }
     // Check availability before starting a normal attachment download (no blob URL).
     await api(`/api/evidence/${inv.id}`);
@@ -647,6 +721,7 @@ $("#btnAisFetch").onclick = async () => {
 document.querySelector('#nav button[data-page="data"]').addEventListener("click", () => { renderStatus(); renderJobs(); });
 $("#casePicker").onchange = (event) => {
   if (event.target.value === "demo") startHistoricalReplay();
+  else if (event.target.value === "reception") startRealReception();
   else if (!S.inv) goto("dashboard");
 };
 renderStageStatus();
