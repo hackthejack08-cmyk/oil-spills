@@ -39,7 +39,7 @@ function loadPublicDemoData() {
   return demoDataPromise;
 }
 const publicDemoApi = async (path) => {
-  if (path === "/api/health") return { status: "public-demo", cnn_weights: true, land_mask_available: true, mode: "static replay" };
+  if (path === "/api/health") return { status: "public-demo", cnn_weights: false, detector: "baseline-adaptive-threshold", land_mask_available: true, mode: "static replay" };
   if (path === "/api/data/jobs" || path === "/api/uploads") return [];
   const data = await loadPublicDemoData();
   if (path === "/api/demo/run") return data.case;
