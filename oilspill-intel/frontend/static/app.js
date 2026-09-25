@@ -137,7 +137,21 @@ const publicDemoApi = async (path) => {
   if (path === "/api/health") return { status: "public-demo", cnn_weights: false, detector: "baseline-adaptive-threshold", land_mask_available: true, mode: "static replay" };
   if (path === "/api/data/jobs" || path === "/api/uploads") return [];
   const data = await loadPublicDemoData();
-  if (path === "/api/demo/run") return data.case;
+  if (path === "/api/demo/run") {
+    data.case.scene.metadata ||= {
+      file_name: "OSI_sample_20250314.tif", platform: "SYNTHETIC-S1-LIKE", polarisation: "VV,VH",
+      crs: "EPSG:4326", width_px: 2048, height_px: 2048,
+      centre: { lon: 70.586433, lat: 19.433728 }, location_label: "19.4337°N, 70.5864°E",
+      source: "Bundled georeferenced judge sample · synthetic, not an observed spill",
+    };
+    data.case.drift.environment ||= {
+      wind_speed_ms: 6.19, wind_from_deg: 229.6, wind_from: "SW",
+      current_speed_ms: 0.343, current_toward_deg: 48.1, current_toward: "NE",
+      forecast_toward_deg: 53.8, forecast_toward: "NE",
+      wind_source: "Bundled synthetic forcing", current_source: "Bundled synthetic forcing",
+    };
+    return data.case;
+  }
   if (path === "/api/data/status") return data.status;
   if (path === "/api/investigations") return [data.case.investigation];
   if (path.startsWith("/api/investigations/")) return data.case;
