@@ -19,6 +19,7 @@
     <button data-page="ais">Vessel tracks</button>
     <button data-page="ranking">Vessel leads</button>
     <button data-page="evidence">Evidence</button>
+    <button data-page="evaluation">Evaluation</button>
     <button data-page="data">Data sources</button>
   </nav>
   <div class="rail-foot"><div class="status" id="health" role="status">Connecting…</div></div>
@@ -176,7 +177,39 @@
     <section id="page-evidence" class="page">
       <h2>Evidence View</h2>
       <div id="evidencePanel"><p class="empty-note">Select a candidate from the table below the map.</p></div>
+      <p class="small muted"><b>Why this exists:</b> the ledger proves which inputs and results were used and whether they changed. It is not an accuracy score; measured performance is under Evaluation.</p>
       <details><summary>Evidence ledger (SHA-256)</summary><div id="ledger" class="small table-scroll"></div></details>
+    </section>
+
+    <section id="page-evaluation" class="page">
+      <h2>Model Evaluation</h2>
+      <p class="warn small"><b>Current status:</b> experimental screening baseline—not validated for unattended operational alerts.</p>
+      <div class="card">
+        <h3>Real Sentinel-1 screening benchmark</h3>
+        <p class="small muted">Reproduced on 19 usable GlobalOSD-SAR point labels: 10 oil positives and 9 look-alikes. Threshold 0.50; a hit is a candidate within 8 km of the labelled point.</p>
+        <table>
+          <tbody>
+            <tr><th>Metric</th><th>Measured result</th></tr>
+            <tr><td>Oil recall</td><td><b>80.0%</b> (8/10)</td></tr>
+            <tr><td>False-alarm rate</td><td><b>44.4%</b> (4/9)</td></tr>
+            <tr><td>Derived precision</td><td><b>66.7%</b> (8/12 alerts)</td></tr>
+            <tr><td>Overall sample accuracy</td><td><b>68.4%</b> (13/19)</td></tr>
+            <tr><td>Oil-likelihood AUC</td><td><b>0.622</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card">
+        <h3>Not measured yet</h3>
+        <p><b>Segmentation IoU / Dice:</b> unavailable because this sample has point labels, not pixel masks.</p>
+        <p><b>Drift forecast error:</b> not yet validated against observed drifter tracks.</p>
+        <p><b>Vessel-ranking accuracy:</b> not yet tested on confirmed polluter cases.</p>
+      </div>
+      <div class="card">
+        <h3>Judge validation pack</h3>
+        <p>Five oil-positive chips and five negative look-alikes, including successful detections, false alarms and a missed case. Expected labels and baseline outputs are listed in <code>manifest.csv</code>.</p>
+        <a class="sample-file" href="samples/OSI_judge_validation_pack.zip" download>Download labelled real-SAR pack <span>24.9 MB · 10 GeoTIFFs</span></a>
+        <p class="small muted">GlobalOSD-SAR research labels support screening evaluation; they are not legal proof of a spill or vessel responsibility.</p>
+      </div>
     </section>
   </aside>
 

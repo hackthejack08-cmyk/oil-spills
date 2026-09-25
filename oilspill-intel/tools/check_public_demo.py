@@ -1,6 +1,7 @@
 """Fast, dependency-free checks for the static SIH judge build."""
 
 from pathlib import Path
+import zipfile
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -27,11 +28,20 @@ def main() -> None:
     assert (PUBLIC / "samples" / "S1A_IW_20190616_140738_quicklook.png").is_file(), "SAR quicklook is missing"
     assert (PUBLIC / "samples" / "S1A_IW_20190616_140738_analysis.json").is_file(), "published SAR analysis is missing"
     assert (PUBLIC / "samples" / "S1A_IW_20190616_140738_analysis_prob.png").is_file(), "SAR score overlay is missing"
+    validation_pack = PUBLIC / "samples" / "OSI_judge_validation_pack.zip"
+    assert validation_pack.is_file() and validation_pack.stat().st_size > 20_000_000, "judge validation pack is missing or incomplete"
+    with zipfile.ZipFile(validation_pack) as archive:
+        names = archive.namelist()
+        assert "README.md" in names and "manifest.csv" in names, "validation pack documentation is missing"
+        assert len([name for name in names if name.startswith("positive_oil/") and name.endswith(".tif")]) == 5, "positive SAR examples are incomplete"
+        assert len([name for name in names if name.startswith("negative_lookalikes/") and name.endswith(".tif")]) == 5, "negative SAR examples are incomplete"
     assert "btnAnalyze\", \"btnDrift" not in app, "public SAR analysis button is disabled"
     assert "S1A_IW_20190616_140738_analysis.json" in app, "public SAR analysis is not wired"
+    assert 'data-page="evaluation"' in html and "Oil recall" in html, "evaluation page is missing"
+    assert 'href="samples/OSI_judge_validation_pack.zip"' in html, "validation pack download is not linked"
     assert (ROOT / "frontend" / "static" / "app.js").read_bytes() == (PUBLIC / "app.js").read_bytes(), "public app.js is stale"
     assert (ROOT / "frontend" / "static" / "app.css").read_bytes() == (PUBLIC / "app.css").read_bytes(), "public app.css is stale"
-    print("Public demo check passed: controls, lazy replay data, assets, and source sync are valid.")
+    print("Public demo check passed: controls, evaluation pack, assets, and source sync are valid.")
 
 
 if __name__ == "__main__":
