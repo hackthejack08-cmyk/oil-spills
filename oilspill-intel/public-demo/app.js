@@ -49,6 +49,7 @@ async function loadLiveCatalogue() {
       $("#liveScenePreview").src = preview; $("#liveSceneOpen").href = preview; $("#liveSceneOpen").hidden = false;
     }
     LIVE_FEED.optical = snapshot.optical?.[0] || null;
+    let opticalVisible = false;
     if (LIVE_FEED.optical) {
       const opticalProperties = LIVE_FEED.optical.properties || {};
       const opticalPreview = LIVE_FEED.optical.assets?.rendered_preview?.href || LIVE_FEED.optical.assets?.thumbnail?.href;
@@ -56,14 +57,30 @@ async function loadLiveCatalogue() {
       $("#liveOptical").textContent = `EO companion · ${gapDays.toFixed(1)} d · ${Number(opticalProperties["eo:cloud_cover"] || 0).toFixed(0)}% cloud`;
       if (opticalPreview) {
         $("#liveOpticalPreview").src = opticalPreview; $("#liveOpticalOpen").href = opticalPreview;
-        $("#liveOpticalOpen").hidden = false; $("#liveScenePair").classList.add("paired");
+        $("#liveOpticalOpen").hidden = false; opticalVisible = true;
       }
     } else {
       $("#liveOptical").textContent = "EO companion · inconclusive";
     }
+    const nasa = snapshot.nasa;
+    let nasaVisible = false;
+    if (nasa?.image_url) {
+      const nasaImage = $("#liveNasaPreview");
+      nasaImage.onerror = () => {
+        if (nasa.fallback_image_url && nasaImage.src !== nasa.fallback_image_url) {
+          nasaImage.src = nasa.fallback_image_url; $("#liveNasa").textContent = `NASA NRT · ${nasa.fallback_date}`;
+        }
+      };
+      nasaImage.src = nasa.image_url; $("#liveNasaOpen").href = nasa.image_url; $("#liveNasaOpen").hidden = false;
+      $("#liveNasa").textContent = `NASA NRT · ${nasa.date}`; nasaVisible = true;
+    } else {
+      $("#liveNasa").textContent = "NASA NRT · unavailable";
+    }
+    $("#liveScenePair").classList.toggle("with-nasa", opticalVisible && nasaVisible);
+    $("#liveScenePair").classList.toggle("paired", opticalVisible !== nasaVisible);
     $("#liveSceneNote").textContent = window.OSI_PUBLIC_DEMO
-      ? "Live catalogue preview; the button below runs the verified judge replay. Full detection runs on the FastAPI monitor."
-      : "The service can stream this AOI, screen every slick candidate, then add weather, drift and AIS evidence.";
+      ? "Live SAR, matched EO and NASA VIIRS context. The verified replay below demonstrates detection, drift and AIS attribution."
+      : "The service streams SAR for detection; EO and NASA VIIRS remain supporting context before drift and AIS review.";
     $("#btnReceiveSample").textContent = "View latest real radar image";
     $("#btnReceiveMap").textContent = "View latest real radar image";
     if (window.OSI_PUBLIC_DEMO) $("#health").textContent = "● Live catalogue connected";
@@ -71,7 +88,7 @@ async function loadLiveCatalogue() {
     $("#liveSceneAge").textContent = "Unavailable";
     $("#liveSceneTitle").textContent = "Satellite catalogue could not be reached";
     $("#liveSceneMeta").textContent = "The verified offline replay is still available.";
-    $("#liveArchive").textContent = "Archive · unavailable"; $("#liveOptical").textContent = "Optical · unavailable";
+    $("#liveArchive").textContent = "Archive · unavailable"; $("#liveOptical").textContent = "EO · unavailable"; $("#liveNasa").textContent = "NASA · unavailable";
     $("#liveSceneNote").textContent = error.message;
   }
 }

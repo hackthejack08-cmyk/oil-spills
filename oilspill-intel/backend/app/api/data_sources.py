@@ -43,6 +43,7 @@ def status():
         {"id": "hycom", "name": "Ocean currents – HYCOM GOFS/ESPC (NCSS)", "ready": True, "account": "none", "note": "NetCDF subset service; 2018-12 → today + 8-day forecast, 1/12°, 3-hourly"},
         {"id": "cmems", "name": "Ocean currents – Copernicus Marine (optional)", "ready": cmems, "account": "free CMEMS account", "note": "set OSI_CMEMS_USER/OSI_CMEMS_PASSWORD; needs `copernicusmarine`"},
         {"id": "open_meteo", "name": "10 m wind – Open-Meteo ERA5 archive", "ready": True, "account": "none (CC BY 4.0, non-commercial free tier)", "note": "0.25°, hourly, 1940 →"},
+        {"id": "nasa_gibs", "name": "NASA GIBS – NOAA-21 VIIRS true colour", "ready": True, "account": "none", "note": "latest available daily near-real-time optical context; not used as the SAR detector"},
         {"id": "marinecadastre", "name": "Historical AIS – NOAA MarineCadastre", "ready": True, "account": "none (CC0)", "note": "US waters; 2009–2023 direct daily zips verified; newer years via AccessAIS export"},
         {"id": "dma", "name": "Historical AIS – Danish Maritime Authority", "ready": True, "account": "none", "note": "Danish waters; ~2 GB per day file"},
         {"id": "aisstream", "name": "Live AIS – aisstream.io", "ready": ais_key, "account": "free API key", "note": "real-time only, no history; set OSI_AISSTREAM_KEY"},

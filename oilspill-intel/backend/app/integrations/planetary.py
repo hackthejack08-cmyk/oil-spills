@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
+from urllib.parse import urlencode
 
 import time
 
@@ -31,6 +32,36 @@ def _get(url, tries=4, **kw):
 STAC = "https://planetarycomputer.microsoft.com/api/stac/v1/search"
 SAS = "https://planetarycomputer.microsoft.com/api/sas/v1/token/sentinel-1-grd"
 LIVE_AOI = [72.2, 18.6, 73.0, 19.5]
+NASA_GIBS = "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi"
+NASA_LAYER = "VIIRS_NOAA21_CorrectedReflectance_TrueColor"
+
+
+def nasa_context(now: datetime, bbox: list[float]) -> dict:
+    def image_url(day: datetime) -> str:
+        query = urlencode({
+            "SERVICE": "WMS", "REQUEST": "GetMap", "VERSION": "1.1.1", "LAYERS": NASA_LAYER,
+            "STYLES": "", "FORMAT": "image/jpeg", "TRANSPARENT": "FALSE", "HEIGHT": 512, "WIDTH": 512,
+            "SRS": "EPSG:4326", "BBOX": ",".join(map(str, bbox)), "TIME": day.date().isoformat(),
+        })
+        return f"{NASA_GIBS}?{query}"
+    available = []
+    for offset in range(3):
+        day = now - timedelta(days=offset)
+        url = image_url(day)
+        try:
+            response = requests.get(url, timeout=20)
+            if response.ok and response.headers.get("content-type", "").startswith("image/") and len(response.content) > 5000:
+                available.append((day, url))
+                break
+        except requests.RequestException:
+            continue
+    day, url = available[0] if available else (now - timedelta(days=1), image_url(now - timedelta(days=1)))
+    fallback = day - timedelta(days=1)
+    return {
+        "source": "NASA GIBS", "sensor": "NOAA-21 VIIRS", "layer": NASA_LAYER,
+        "date": day.date().isoformat(), "image_url": url,
+        "fallback_date": fallback.date().isoformat(), "fallback_image_url": image_url(fallback),
+    }
 
 
 def search(lon: float, lat: float, start: str, end: str, top: int = 10, bbox=None) -> list[dict]:
@@ -104,7 +135,8 @@ def live_snapshot(bbox=None) -> dict:
             "properties": {"datetime": feature.get("properties", {}).get("datetime"),
                            "eo:cloud_cover": feature.get("properties", {}).get("eo:cloud_cover")},
         } for feature in features[:5]]
-    return {"area": "Mumbai coast", "bbox": bbox, "checked_at": now.isoformat(), "radar": radar, "optical": optical}
+    return {"area": "Mumbai coast", "bbox": bbox, "checked_at": now.isoformat(),
+            "radar": radar, "optical": optical, "nasa": nasa_context(now, bbox)}
 
 
 def item(item_id: str) -> dict:

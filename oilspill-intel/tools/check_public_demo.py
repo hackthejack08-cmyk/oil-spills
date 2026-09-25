@@ -17,7 +17,7 @@ def main() -> None:
         "btnReplayRestart", "replaySpeed", "btnReceiveSample", "btnReceiveMap",
         "acquisitionProgress", "chkEnhanced", "chkSlick",
         "chkDriftLayers", "chkAisLayers", "btnExport",
-        "liveFeed", "liveScenePreview", "liveOpticalPreview", "liveArchive", "liveOptical",
+        "liveFeed", "liveScenePreview", "liveOpticalPreview", "liveNasaPreview", "liveArchive", "liveOptical", "liveNasa",
     }
     missing = sorted(element_id for element_id in required_ids if f'id="{element_id}"' not in html)
     assert not missing, f"missing public controls: {', '.join(missing)}"
@@ -42,6 +42,7 @@ def main() -> None:
     assert 'data-page="evaluation"' in html and "How many labelled oil scenes were found?" in html, "evaluation page is missing"
     assert "Check slick" in app and "Possible spills" in app, "simple public workflow is missing"
     assert "sentinel-1-grd" in live_api and "sentinel-2-l2a" in live_api, "live radar and optical catalogue checks are missing"
+    assert "gibs.earthdata.nasa.gov" in live_api and "VIIRS_NOAA21" in live_api, "NASA GIBS context is missing"
     assert "Near-real-time Sentinel-1" in html, "live catalogue status is missing"
     assert "loaded automatically" in html and "matched automatically" in html, "automatic input guidance is missing"
     assert "d.oil_likelihood >= 0.5" in app and "if (!window.OSI_PUBLIC_DEMO)" in app, "simple map filtering is missing"

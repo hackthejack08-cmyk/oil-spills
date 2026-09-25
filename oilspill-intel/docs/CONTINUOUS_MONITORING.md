@@ -21,7 +21,7 @@ The monitor follows the evidence order described in Bellingcat's marine-oil-spil
 6. **Vessel evidence:** correlate authorised historical AIS tracks with every plausible origin time and rank investigative leads. A score is never proof of responsibility.
 7. **Audit:** preserve source IDs, times, parameters, outputs and hashes for analyst review.
 
-The public dashboard now queries the live Planetary Computer STAC catalogue every five minutes while it is open. It shows the latest real Sentinel-1 acquisition, recent-scene count and the best time/cloud-balanced Sentinel-2 companion. This EO pairing is contextual evidence for manual review; automated pixel-level SAR–EO validation is not yet implemented. The judge result remains the labelled, deterministic replay. Actual pixel streaming and detection use the FastAPI monitor described below.
+The public dashboard now queries the live Planetary Computer STAC catalogue every five minutes while it is open. It shows the latest real Sentinel-1 acquisition, recent-scene count and the best time/cloud-balanced Sentinel-2 companion. It also requests the latest daily NOAA-21/VIIRS true-colour context from NASA GIBS, falling back one day when the current image is unavailable. These optical sources are contextual evidence for manual review; automated pixel-level SAR–EO validation is not yet implemented. The judge result remains the labelled, deterministic replay. Actual pixel streaming and detection use the FastAPI monitor described below.
 
 The implemented endpoint is `POST /api/data/monitor/scan`. It is idempotent, runs as a background job, and supports up to 50 newly discovered products per cycle. `GET /api/data/monitor/{monitor_id}` returns products, slick events and grouped incidents.
 
@@ -44,6 +44,6 @@ For an always-on deployment, invoke the scan endpoint every 15 minutes or forwar
 - Operational catalogue: Copernicus Data Space Sentinel-1 GRD STAC / Subscriptions.
 - Prototype pixel access: Microsoft Planetary Computer Sentinel-1 GRD COGs, because AOI windows can be streamed without downloading a full product.
 - Training and validation: GlobalOSD-SAR (DOI `10.5281/zenodo.15286918`, CC BY 4.0). Its point labels are suitable for detection screening and look-alike evaluation, but not pixel-mask IoU by themselves.
-- Optical corroboration: Sentinel-2 L2A from Planetary Computer; NASA GIBS/VIIRS is optional broad-area context and is too coarse to be the primary detector for small slicks.
+- Optical corroboration: Sentinel-2 L2A from Planetary Computer plus daily NASA GIBS NOAA-21/VIIRS broad-area context. VIIRS is refreshed automatically but is too coarse to be the primary detector for small slicks.
 
 The UI's full monitoring cycle remains synthetic and labelled as such. The separate Sentinel-1 reception view uses historic measured SAR.
