@@ -570,10 +570,12 @@ async function sha256(file) {
 
 $("#btnAutoRun").onclick = async () => {
   const file = $("#autoSceneFile").files[0];
-  if (!file) return notify("Choose a georeferenced SAR GeoTIFF first.", true);
+  const remoteUrl = $("#autoSceneUrl").value.trim();
+  if (!file && !remoteUrl) return notify("Choose a SAR GeoTIFF or paste its direct HTTPS URL.", true);
   $("#btnAutoRun").disabled = true; $("#autoProgress").textContent = "Uploading image…";
   if (window.OSI_PUBLIC_DEMO) {
     try {
+      if (remoteUrl) throw new Error("Internet GeoTIFF processing needs the full analysis worker; this public page currently runs the verified sample only.");
       if (file.size !== PUBLIC_SAMPLE.bytes || await sha256(file) !== PUBLIC_SAMPLE.sha256) {
         throw new Error("The public demo accepts the downloadable sample only. Run the local or Docker build to analyse another GeoTIFF.");
       }
@@ -588,10 +590,12 @@ $("#btnAutoRun").onclick = async () => {
     }
     return;
   }
-  const form = new FormData(); form.append("file", file);
   try {
     let response;
-    try { response = await fetch("/api/auto/run", { method: "POST", body: form }); }
+    try {
+      if (remoteUrl) response = await fetch("/api/auto/url", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: remoteUrl }) });
+      else { const form = new FormData(); form.append("file", file); response = await fetch("/api/auto/run", { method: "POST", body: form }); }
+    }
     catch { throw new Error("Cannot reach the analysis service. Start the server or Docker container, then try again."); }
     const payload = await response.json().catch(() => ({ detail: `Upload failed with HTTP ${response.status}` }));
     if (!response.ok) throw new Error(payload.detail || "Upload failed");

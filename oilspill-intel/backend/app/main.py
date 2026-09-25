@@ -5,15 +5,19 @@
 from __future__ import annotations
 
 import json
+import ipaddress
 import logging
 import os
 import re
+import socket
 from datetime import datetime, timezone
 import shutil
 import uuid
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urljoin, urlparse
 
+import requests
 from fastapi import FastAPI, File, HTTPException, UploadFile, Form
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -60,6 +64,10 @@ class AISIn(BaseModel):
     investigation_id: str
     ais: str = Field("demo", description="'demo' or an upload id of a CSV")
     radius_km: float = Field(config.AIS_SEARCH_RADIUS_KM, ge=1, le=500)
+
+
+class RemoteSceneIn(BaseModel):
+    url: str = Field(..., min_length=12, max_length=2048)
 
 
 def _resolve(kind: str, ref: str) -> Path:
@@ -165,6 +173,71 @@ def _run_image_case(path: Path, original_name: str, sensing_time: str, progress)
     return result
 
 
+def _queue_image_case(path: Path, original_name: str, size: int, digest: str, uid: str) -> dict:
+    try:
+        sensing_time = _scene_time(path, original_name)
+    except Exception as exc:
+        path.unlink(missing_ok=True)
+        raise HTTPException(422, f"Cannot use this image automatically: {exc}")
+
+    job = jobs.submit("image_investigation", lambda progress: _run_image_case(path, original_name, sensing_time, progress))
+    return {"job_id": job["id"], "upload_id": uid, "bytes": size, "sha256": digest,
+            "sensing_time": sensing_time}
+
+
+def _public_https_url(url: str) -> str:
+    parsed = urlparse(url)
+    if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
+        raise HTTPException(400, "Use a public HTTPS GeoTIFF URL")
+    try:
+        addresses = {ipaddress.ip_address(item[4][0]) for item in socket.getaddrinfo(parsed.hostname, 443, type=socket.SOCK_STREAM)}
+    except socket.gaierror as exc:
+        raise HTTPException(400, "GeoTIFF host could not be resolved") from exc
+    if not addresses or any(not address.is_global for address in addresses):
+        raise HTTPException(400, "Private, local and reserved network addresses are not allowed")
+    return url
+
+
+def _download_remote_scene(url: str) -> tuple[str, Path, int, str, str]:
+    current = url
+    response = None
+    try:
+        for _ in range(4):
+            current = _public_https_url(current)
+            response = requests.get(current, stream=True, timeout=(10, 90), allow_redirects=False,
+                                    headers={"User-Agent": "OSI-SIH26143/1.0"})
+            if response.is_redirect:
+                current = urljoin(current, response.headers.get("location", "")); response.close(); continue
+            response.raise_for_status(); break
+        else:
+            raise HTTPException(400, "Too many redirects while downloading GeoTIFF")
+    except requests.RequestException as exc:
+        raise HTTPException(502, f"GeoTIFF download failed: {exc}") from exc
+
+    suffix = Path(urlparse(current).path).suffix.lower()
+    content_type = response.headers.get("content-type", "").split(";", 1)[0].lower()
+    if suffix not in ALLOWED_SUFFIX and content_type not in {"image/tiff", "image/geotiff", "application/geotiff", "application/octet-stream"}:
+        response.close(); raise HTTPException(415, "URL must point directly to a GeoTIFF (.tif or .tiff)")
+    uid = uuid.uuid4().hex; path = config.DATA_DIR / "uploads" / f"{uid}.tif"; size = 0
+    try:
+        with path.open("wb") as output:
+            for chunk in response.iter_content(1 << 20):
+                if not chunk: continue
+                size += len(chunk)
+                if size > MAX_UPLOAD_MB << 20:
+                    raise HTTPException(413, f"file exceeds the {MAX_UPLOAD_MB} MB limit")
+                output.write(chunk)
+        with path.open("rb") as source:
+            signature = source.read(4)
+        if signature not in (b"II*\x00", b"MM\x00*", b"II+\x00", b"MM\x00+"):
+            raise HTTPException(415, "Downloaded file is not a TIFF")
+        return uid, path, size, db.sha256_file(path), Path(urlparse(current).path).name or f"remote-{uid}.tif"
+    except Exception:
+        path.unlink(missing_ok=True); raise
+    finally:
+        response.close()
+
+
 @app.get("/api/health")
 def health():
     return {"status": "ok", "demo_data": (config.DEMO_DIR / "synthetic_s1_scene.tif").exists(),
@@ -233,19 +306,14 @@ async def upload(kind: str = Form(...), file: UploadFile = File(...)):
 async def auto_run(file: UploadFile = File(...)):
     """Queue the simple one-image workflow and return immediately."""
     uid, path, size, digest = await _save_upload("scene", file)
-    original_name = file.filename or path.name
-    try:
-        sensing_time = _scene_time(path, original_name)
-    except Exception as exc:
-        path.unlink(missing_ok=True)
-        raise HTTPException(422, f"Cannot use this image automatically: {exc}")
+    return _queue_image_case(path, file.filename or path.name, size, digest, uid)
 
-    def run(progress):
-        return _run_image_case(path, original_name, sensing_time, progress)
 
-    job = jobs.submit("image_investigation", run)
-    return {"job_id": job["id"], "upload_id": uid, "bytes": size, "sha256": digest,
-            "sensing_time": sensing_time}
+@app.post("/api/auto/url")
+def auto_url(body: RemoteSceneIn):
+    """Download and queue one public georeferenced SAR GeoTIFF."""
+    uid, path, size, digest, name = _download_remote_scene(body.url)
+    return _queue_image_case(path, name, size, digest, uid)
 
 
 @app.post("/api/satellite/analyze")

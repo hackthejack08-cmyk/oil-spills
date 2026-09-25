@@ -313,6 +313,7 @@ main { min-height: 0; flex: 1; display: flex; }
 .upload-card h3 { margin: 0 0 8px; }
 .upload-card label { display: block; margin: 0 0 8px; font-weight: 600; }
 .upload-card input[type="file"] { display: block; width: 100%; margin-top: 6px; padding: 7px; border: 1px dashed var(--accent); background: white; }
+.upload-card input[type="url"] { display: block; width: 100%; margin-top: 6px; }
 .upload-card .primary { width: 100%; margin-bottom: 8px; }
 .sample-download { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: -2px 0 13px; }
 .sample-download a { font-weight: 600; }

@@ -79,6 +79,11 @@ def test_path_traversal_rejected():
     r = client.post("/api/ais/analyze", json={"investigation_id": "x", "ais": "../../etc/passwd"}); assert r.status_code == 400
 
 
+def test_remote_scene_blocks_private_networks():
+    response = client.post("/api/auto/url", json={"url": "https://127.0.0.1/private-scene.tif"})
+    assert response.status_code == 400 and "Private" in response.json()["detail"]
+
+
 def test_one_image_entrypoint_reads_geotiff_metadata(tmp_path, monkeypatch):
     from app import jobs
     scene = tmp_path / "scene.tif"
