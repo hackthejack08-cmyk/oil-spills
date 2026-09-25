@@ -39,6 +39,8 @@ def main() -> None:
     assert "S1A_IW_20190616_140738_analysis.json" in app, "public SAR analysis is not wired"
     assert 'data-page="evaluation"' in html and "How many labelled oil scenes were found?" in html, "evaluation page is missing"
     assert "Check for oil" in app and "Possible spills" in app, "simple public workflow is missing"
+    assert "loaded automatically" in html and "matched automatically" in html, "automatic input guidance is missing"
+    assert "d.oil_likelihood >= 0.5" in app and "if (!window.OSI_PUBLIC_DEMO)" in app, "simple map filtering is missing"
     assert 'href="samples/OSI_judge_validation_pack.zip"' in html, "validation pack download is not linked"
     assert (ROOT / "frontend" / "static" / "app.js").read_bytes() == (PUBLIC / "app.js").read_bytes(), "public app.js is stale"
     assert (ROOT / "frontend" / "static" / "app.css").read_bytes() == (PUBLIC / "app.css").read_bytes(), "public app.css is stale"

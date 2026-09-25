@@ -60,6 +60,11 @@
       <div class="operation-card">
         <button id="btnRunReplay" class="primary">Scan for oil spills</button>
         <button id="btnReceiveSample" class="secondary">View a real radar image</button>
+        <ul class="automatic-inputs" aria-label="Automatic inputs">
+          <li><b>Time</b><span>read from the image</span></li>
+          <li><b>Wind and currents</b><span>loaded automatically</span></li>
+          <li><b>Vessel tracks</b><span>matched automatically</span></li>
+        </ul>
         <div class="sample-meta">
           <span><b>Sentinel-1A</b> · IW GRD</span>
           <span>16 Jun 2019 · 25 s</span>
@@ -93,7 +98,7 @@
         </ol>
         <p class="small muted">Attribution is a decision-support result and requires analyst review.</p>
       </details>
-      <details><summary>Advanced tools</summary>
+      <details class="advanced-tools"><summary>Advanced tools</summary>
         <div class="advanced-links"><a href="#" onclick="goto('satellite');return false">Image settings</a><a href="#" onclick="goto('drift');return false">Drift settings</a><a href="#" onclick="goto('ais');return false">Vessel-track settings</a><a href="#" onclick="goto('data');return false">Data connections</a></div>
         <button id="btnNew" class="secondary">New real-data investigation</button>
         <label>Open existing <select id="invSel"><option value="">— select —</option></select></label>

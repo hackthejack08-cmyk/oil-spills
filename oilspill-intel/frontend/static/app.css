@@ -278,6 +278,9 @@ main { min-height: 0; flex: 1; display: flex; }
 .operation-head b { color: #21734c; font-size: 11px; }
 .operation-card { margin-bottom: 14px; padding: 14px; border: 1px solid var(--line); border-radius: 11px; background: linear-gradient(145deg, #f8fbfc, #fff); box-shadow: 0 8px 24px rgba(17,48,61,.06); }
 .operation-card .primary, .operation-card .secondary { margin: 0 0 8px; }
+.automatic-inputs { margin: 8px 0; padding: 0; border-top: 1px solid var(--line); list-style: none; }
+.automatic-inputs li { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 10px; }
+.automatic-inputs span { color: var(--muted); text-align: right; }
 .sample-meta { display: flex; justify-content: space-between; gap: 10px; margin-top: 8px; color: var(--muted); font-size: 10px; }
 .sample-meta b { color: var(--text); }
 .sample-file { display: flex; justify-content: space-between; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); color: var(--accent-dark); font-size: 11px; font-weight: 600; text-decoration: none; }
@@ -427,6 +430,8 @@ progress { max-width: 100%; accent-color: var(--accent); }
 .public-demo #nav button[data-page="ais"],
 .public-demo #nav button[data-page="data"] { display: none; }
 .public-demo .stage-list { grid-template-columns: repeat(4, minmax(80px, 1fr)); }
+.public-demo .case-picker, .public-demo .replay-controls, .public-demo .advanced-tools, .public-demo .map-tools .chk { display: none; }
+.public-demo .stage-strip { grid-template-columns: 135px minmax(0, 1fr); }
 @media (max-width: 1100px) {
   .rail { width: 142px; flex-basis: 142px; padding-inline: 7px; }
   .brand { font-size: 25px; }

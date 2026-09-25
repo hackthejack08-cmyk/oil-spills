@@ -7,6 +7,7 @@ const PIPELINE_STAGES = [
   ["acquisition", "New scenes"], ["preprocessing", "SAR processed"], ["detection", "Slicks detected"],
   ["drift", "Drift forecast"], ["ais", "Vessel correlation"], ["evidence", "Alerts"],
 ];
+const reviewDetections = (scene) => (scene?.detections || []).filter((d) => !window.OSI_PUBLIC_DEMO || d.oil_likelihood >= 0.5);
 const REAL_SAR_SAMPLE = {
   id: "S1A_IW_GRDH_1SDV_20190616T140738_20190616T140803_027706_03209B",
   start: "2019-06-16T14:07:38Z",
@@ -98,7 +99,7 @@ fetch(window.OSI_PUBLIC_DEMO ? "data/coastline.geojson" : "/api/demo/coastline")
 for (let lat = -80; lat <= 80; lat += 1) L.polyline([[lat, -180], [lat, 180]], { color: "#9baeb5", weight: 0.5, opacity: 0.55, interactive: false }).addTo(layers.graticule);
 for (let lon = -180; lon <= 180; lon += 1) L.polyline([[-85, lon], [85, lon]], { color: "#9baeb5", weight: 0.5, opacity: 0.55, interactive: false }).addTo(layers.graticule);
 const legend = (rows) => ($("#legend").innerHTML = rows.map(([c, t]) => `<div><span class="sw" style="background:${c}"></span>${t}</div>`).join(""));
-legend([["#ff5a3c", "Suspected slick"], ["#ffb648", "Model origin 50 / 90% ellipse"], ["#3ec5ff", "Hindcast"], ["#39d98a", "Forecast"], ["#c8d3ea", "Vessel track"], ["#ff3cf0", "AIS gap (dashed)"]]);
+legend(window.OSI_PUBLIC_DEMO ? [["#ff5a3c", "Oil candidate"], ["#3ec5ff", "Possible origin path"], ["#39d98a", "Forecast path"], ["#c8d3ea", "Vessel track"]] : [["#ff5a3c", "Suspected slick"], ["#ffb648", "Model origin 50 / 90% ellipse"], ["#3ec5ff", "Hindcast"], ["#39d98a", "Forecast"], ["#c8d3ea", "Vessel track"], ["#ff3cf0", "AIS gap (dashed)"]]);
 
 /* ---------------- nav ---------------- */
 document.querySelectorAll("#nav button").forEach((b) => b.onclick = () => {
@@ -153,7 +154,7 @@ async function analyzeScene() {
       renderScene(); log(`published baseline analysis loaded → ${scene.detections.length} candidate(s)`);
       setStage("acquisition", "complete"); setStage("preprocessing", "complete");
       setStage("detection", scene.detections.length ? "complete" : "partial");
-      notify(`${scene.detections.length} unconfirmed dark-feature candidate(s) found. Scores require analyst review.`);
+      notify(`${reviewDetections(scene).length} oil candidate(s) require review.`);
       return;
     }
     const pending = $("#sceneFile").files[0];
@@ -174,7 +175,7 @@ function renderScene() {
   layers.prob = s.prob_overlay ? L.imageOverlay(s.prob_overlay, bounds, { opacity: $("#chkProb").checked ? 0.8 : 0 }).addTo(map) : null;
   if (layers.scene) layers.scene.on("error", () => notify("Radar preview file is unavailable. Re-analyse this scene to regenerate it.", true));
   applyImagePreview();
-  layers.slick.clearLayers(); s.detections.forEach((d) => layers.slick.addData({ type: "Feature", properties: d, geometry: d.geometry.polygon_geojson }));
+  layers.slick.clearLayers(); reviewDetections(s).forEach((d) => layers.slick.addData({ type: "Feature", properties: d, geometry: d.geometry.polygon_geojson }));
   layers.slick.eachLayer((l) => l.bindTooltip(`${l.feature.properties.label} · ${fmt(l.feature.properties.geometry.area_km2)} km²`));
   map.fitBounds(bounds);
   $("#sceneInfo").innerHTML = `<div class="card"><h4>Scene</h4>sensing ${s.sensing_time || "?"} · detector <b>${s.detector}</b> · ${s.processing_s}s<br>
@@ -215,15 +216,16 @@ function renderDrift() {
   if (d.forward && $("#chkFwd").checked) {
     L.polyline(d.forward.centre_track.map((p) => [p[1], p[0]]), { color: "#39d98a", weight: 2, dashArray: "2 6" }).addTo(layers.fwd);
     const last = d.forward.hypotheses[d.forward.hypotheses.length - 1];
-    if (last) L.geoJSON(last.ellipse90, { style: { color: "#39d98a", weight: 1, fillOpacity: 0.12 } }).bindTooltip(`forecast +${last.age_hours} h (90 %)`).addTo(layers.fwd);
+    if (last && !window.OSI_PUBLIC_DEMO) L.geoJSON(last.ellipse90, { style: { color: "#39d98a", weight: 1, fillOpacity: 0.12 } }).bindTooltip(`forecast +${last.age_hours} h (90 %)`).addTo(layers.fwd);
   }
   const age = +$("#ageSlider").value; const h = d.backward.hypotheses[Math.min(age, d.backward.hypotheses.length) - 1];
   $("#ageLbl").textContent = `${h.age_hours} h  →  ${h.time.slice(0, 16)}Z`;
-  L.geoJSON(h.ellipse90, { style: { color: "#ffb648", weight: 1, fillOpacity: 0.10, dashArray: "3 3" } }).addTo(layers.ellipses);
-  L.geoJSON(h.ellipse50, { style: { color: "#ffb648", weight: 2, fillOpacity: 0.25 } }).bindTooltip(`origin hypothesis ${h.age_hours} h · 50 % ellipse ${fmt(h.ellipse50.semi_axes_km[0], 1)}×${fmt(h.ellipse50.semi_axes_km[1], 1)} km`).addTo(layers.ellipses);
-  h.particles.forEach((p) => L.circleMarker([p[1], p[0]], { radius: 1.5, color: "#ffb648", opacity: 0.5, interactive: false }).addTo(layers.ellipses));
-  // all-hypothesis envelope
-  d.backward.hypotheses.forEach((x) => L.circleMarker([x.centre[1], x.centre[0]], { radius: 3, color: "#3ec5ff", fillOpacity: 1 }).bindTooltip(`age ${x.age_hours} h · spread ${fmt(x.spread_km, 1)} km`).addTo(layers.back));
+  if (!window.OSI_PUBLIC_DEMO) {
+    L.geoJSON(h.ellipse90, { style: { color: "#ffb648", weight: 1, fillOpacity: 0.10, dashArray: "3 3" } }).addTo(layers.ellipses);
+    L.geoJSON(h.ellipse50, { style: { color: "#ffb648", weight: 2, fillOpacity: 0.25 } }).bindTooltip(`origin hypothesis ${h.age_hours} h · 50 % ellipse ${fmt(h.ellipse50.semi_axes_km[0], 1)}×${fmt(h.ellipse50.semi_axes_km[1], 1)} km`).addTo(layers.ellipses);
+    h.particles.forEach((p) => L.circleMarker([p[1], p[0]], { radius: 1.5, color: "#ffb648", opacity: 0.5, interactive: false }).addTo(layers.ellipses));
+    d.backward.hypotheses.forEach((x) => L.circleMarker([x.centre[1], x.centre[0]], { radius: 3, color: "#3ec5ff", fillOpacity: 1 }).bindTooltip(`age ${x.age_hours} h · spread ${fmt(x.spread_km, 1)} km`).addTo(layers.back));
+  }
   // Disabled UI cleanup: drawVectors(h) is schematic and could be mistaken for measured forcing.
   // if ($("#chkVec").checked) drawVectors(h);
   $("#driftInfo").innerHTML = `<div class="card"><h4>Origin estimate</h4>Release window: <b>${d.origin_window.earliest.slice(0, 16)}Z → ${d.origin_window.latest.slice(0, 16)}Z</b><br>
@@ -395,7 +397,7 @@ function kpis() {
   ].map((s) => `<span>${s}</span>`).join("") : S.inv ? [
     `Latest image <b>${esc(S.scene?.sensing_time?.replace("T", " ") || "Waiting")}</b>`,
     `Images checked <b>${S.scene ? "1" : "0"}</b>`,
-    `Possible spills <b>${S.scene?.detections?.length || 0}</b>`,
+    `Possible spills <b>${reviewDetections(S.scene).length}</b>`,
     '<b>Review required before action</b>'
   ].map((s) => `<span>${s}</span>`).join("") : "Choose an operation to begin.";
   renderCandidates();
@@ -561,7 +563,7 @@ function runReplayStage() {
       $("#acquisitionProgress").style.width = `${(replay.index / PIPELINE_STAGES.length) * 100}%`;
       if (replay.index >= PIPELINE_STAGES.length) {
         replay.active = false; $("#btnReplayPause").disabled = true; $("#btnReplayPause").textContent = "Pause";
-        const slicks = S.scene?.detections?.length || 0;
+        const slicks = reviewDetections(S.scene).length;
         $("#systemValue").textContent = "Watching"; $("#operationState").textContent = "Watching";
         $("#replayClock").textContent = `Cycle complete · 1 scene · ${slicks} slicks · next catalogue check 15 min`;
         notify(`Monitoring cycle complete. ${slicks} suspected slicks require analyst review.`);
