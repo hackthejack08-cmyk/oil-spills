@@ -57,6 +57,16 @@
   <aside id="sidebar" tabindex="-1" aria-label="Investigation controls and evidence">
     <section id="page-dashboard" class="page active">
       <div class="operation-head"><span>Oil-spill monitor</span><b id="operationState">Ready</b></div>
+      <div class="image-workflow upload-card">
+        <h3>Upload SAR GeoTIFF</h3>
+        <label>Select a georeferenced .tif or .tiff file<input type="file" id="autoSceneFile" accept=".tif,.tiff"></label>
+        <button id="btnAutoRun" class="primary">Upload and analyse</button>
+        <div id="autoProgress" class="small muted" role="status"></div>
+        <p class="sample-download"><a id="sampleSceneDownload" href="/api/demo/sample-scene" download="OSI_sample_20250314.tif">Download test image</a><span>28.4 MB · synthetic</span></p>
+        <p class="sample-download"><a href="samples/OSI_judge_validation_pack.zip" download>Download sample TIFF folder</a><span>10 measured scenes</span></p>
+        <small>Location and time come from the GeoTIFF. Wind, currents, hindcast and forecast are loaded automatically after detection.</small>
+        <p class="demo-only">The public demo accepts the provided test image and replays its verified result.</p>
+      </div>
       <section id="liveFeed" class="live-feed" aria-label="Latest Sentinel-1 catalogue scene">
         <div class="live-feed-head"><span><i></i> Near-real-time Sentinel-1</span><b id="liveSceneAge">Checking…</b></div>
         <div id="liveScenePair" class="live-scene-pair">
@@ -94,16 +104,6 @@
       <section id="contextPanel" class="context-panel" aria-live="polite" hidden></section>
       <div class="kpis" id="kpis"></div>
       <div class="technical-tools">
-      <h3>Analyse another SAR scene</h3>
-      <div class="image-workflow">
-        <label>SAR GeoTIFF <input type="file" id="autoSceneFile" accept=".tif,.tiff"></label>
-        <p class="sample-download"><a id="sampleSceneDownload" href="/api/demo/sample-scene" download="OSI_sample_20250314.tif">Download test image</a><span>28.4 MB · synthetic</span></p>
-        <p class="sample-download"><a href="samples/OSI_judge_validation_pack.zip" download>Download sample TIFF folder</a><span>10 measured scenes · positive + negative</span></p>
-        <button id="btnAutoRun" class="primary">Analyse image</button>
-        <div id="autoProgress" class="small muted" role="status"></div>
-        <small>Runs detection, drift reconstruction, vessel matching and evidence export. Visual enhancement never changes the detection input.</small>
-        <p class="demo-only">The public demo accepts the provided test image and replays its verified result.</p>
-      </div>
       <button id="btnDemo" class="visually-hidden" tabindex="-1">Run included sample</button>
       <details class="case-meta"><summary>Case information</summary>
         <div class="sih-brief" aria-label="Smart India Hackathon problem alignment">
