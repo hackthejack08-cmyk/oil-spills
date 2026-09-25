@@ -358,10 +358,10 @@ function resetResults() {
 }
 function renderCandidates() {
   const candidates = S.ais?.candidates || [];
-  $("#candidateOverview").innerHTML = candidates.length ? `<table><thead><tr><th>Candidate</th><th>Match / 100</th><th>Closest approach</th><th>AIS gaps</th></tr></thead><tbody>${candidates.map((c) => {
+  $("#candidateOverview").innerHTML = candidates.length ? `<table><thead><tr><th>Vessel</th><th>Evidence match</th><th>Nearest to origin</th><th>Missing tracking</th></tr></thead><tbody>${candidates.map((c) => {
     const track = S.ais.tracks.find((t) => t.mmsi === c.mmsi);
     return `<tr class="${S.selectedVessel === c.mmsi ? "selected-row" : ""}"><td><button class="candidate-button" onclick="showVessel(${c.mmsi})">${esc(c.name)}</button><div class="candidate-tag">${c.mmsi} · ${esc(c.category)}</div></td><td>${fmt(c.correlation * 100, 0)}<div class="bar"><i style="width:${c.correlation * 100}%"></i></div></td><td>${fmt(c.min_distance_km, 1)} km</td><td>${track?.gaps.length ? `<span class="warn">${track.gaps.length} gap(s)</span>` : "None recorded"}</td></tr>`;
-  }).join("")}</tbody></table>` : `<p class="empty-note">${S.ais ? "No vessel matched the search window. Check coverage and radius; this does not exclude untracked vessels." : "Candidates appear after satellite analysis, drift modelling and AIS correlation."}</p>`;
+  }).join("")}</tbody></table>` : `<p class="empty-note">${S.ais ? "No vessel matched this time and location. Untracked vessels may still exist." : "Possible source vessels appear after the scan completes."}</p>`;
 }
 function kpis() {
   const d = S.detection, dr = S.drift, a = S.ais; const top = a && a.candidates[0];
