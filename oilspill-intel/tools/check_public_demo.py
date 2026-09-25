@@ -11,11 +11,13 @@ PUBLIC = ROOT / "public-demo"
 def main() -> None:
     html = (PUBLIC / "index.html").read_text(encoding="utf-8")
     app = (PUBLIC / "app.js").read_text(encoding="utf-8")
+    live_api = (PUBLIC / "api" / "live-scenes.js").read_text(encoding="utf-8")
     required_ids = {
         "casePicker", "stageList", "btnRunReplay", "btnReplayPause",
         "btnReplayRestart", "replaySpeed", "btnReceiveSample", "btnReceiveMap",
         "acquisitionProgress", "chkEnhanced", "chkSlick",
         "chkDriftLayers", "chkAisLayers", "btnExport",
+        "liveFeed", "liveScenePreview", "liveOpticalPreview", "liveArchive", "liveOptical",
     }
     missing = sorted(element_id for element_id in required_ids if f'id="{element_id}"' not in html)
     assert not missing, f"missing public controls: {', '.join(missing)}"
@@ -38,7 +40,9 @@ def main() -> None:
     assert "btnAnalyze\", \"btnDrift" not in app, "public SAR analysis button is disabled"
     assert "S1A_IW_20190616_140738_analysis.json" in app, "public SAR analysis is not wired"
     assert 'data-page="evaluation"' in html and "How many labelled oil scenes were found?" in html, "evaluation page is missing"
-    assert "Check for oil" in app and "Possible spills" in app, "simple public workflow is missing"
+    assert "Check slick" in app and "Possible spills" in app, "simple public workflow is missing"
+    assert "sentinel-1-grd" in live_api and "sentinel-2-l2a" in live_api, "live radar and optical catalogue checks are missing"
+    assert "Near-real-time Sentinel-1" in html, "live catalogue status is missing"
     assert "loaded automatically" in html and "matched automatically" in html, "automatic input guidance is missing"
     assert "d.oil_likelihood >= 0.5" in app and "if (!window.OSI_PUBLIC_DEMO)" in app, "simple map filtering is missing"
     assert 'href="samples/OSI_judge_validation_pack.zip"' in html, "validation pack download is not linked"

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from datetime import datetime, timedelta, timezone
 
 import time
 
@@ -29,6 +30,7 @@ def _get(url, tries=4, **kw):
 
 STAC = "https://planetarycomputer.microsoft.com/api/stac/v1/search"
 SAS = "https://planetarycomputer.microsoft.com/api/sas/v1/token/sentinel-1-grd"
+LIVE_AOI = [72.2, 18.6, 73.0, 19.5]
 
 
 def search(lon: float, lat: float, start: str, end: str, top: int = 10, bbox=None) -> list[dict]:
@@ -66,6 +68,43 @@ def search(lon: float, lat: float, start: str, end: str, top: int = 10, bbox=Non
         if key not in unique or len(product["id"]) > len(unique[key]["id"]):
             unique[key] = product
     return sorted(unique.values(), key=lambda product: product["sensing_start"] or "", reverse=True)[:top]
+
+
+def live_snapshot(bbox=None) -> dict:
+    """Latest Mumbai-coast radar scenes plus a low-cloud optical companion."""
+    bbox = list(bbox or LIVE_AOI)
+    now = datetime.now(timezone.utc)
+    start = now - timedelta(days=120)
+    radar_products = search(
+        (bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2,
+        start.isoformat(), now.isoformat(), 8, bbox=bbox,
+    )
+    radar = [{
+        "id": item["id"], "bbox": item.get("bbox"), "assets": {"rendered_preview": {"href": item.get("assets", {}).get("rendered_preview")}},
+        "properties": {"datetime": item.get("sensing_start"), "platform": item.get("platform"),
+                       "sat:orbit_state": item.get("orbit_direction"), "sar:instrument_mode": "IW"},
+    } for item in radar_products]
+    optical = []
+    if radar_products:
+        observed = datetime.fromisoformat(radar_products[0]["sensing_start"].replace("Z", "+00:00"))
+        optical_end = min(now, observed + timedelta(days=10))
+        body = {"collections": ["sentinel-2-l2a"], "bbox": bbox,
+                "datetime": f"{(observed - timedelta(days=10)).isoformat()}/{optical_end.isoformat()}", "limit": 100}
+        response = requests.post(STAC, json=body, timeout=60); response.raise_for_status()
+        features = response.json().get("features", [])
+        def optical_score(feature):
+            properties = feature.get("properties", {})
+            acquired = datetime.fromisoformat(properties.get("datetime", "").replace("Z", "+00:00"))
+            gap_days = abs((acquired - observed).total_seconds()) / 86400
+            return gap_days + float(properties.get("eo:cloud_cover", 100)) / 10
+        features.sort(key=optical_score)
+        optical = [{
+            "id": feature["id"], "bbox": feature.get("bbox"),
+            "assets": {"rendered_preview": {"href": feature.get("assets", {}).get("rendered_preview", {}).get("href")}},
+            "properties": {"datetime": feature.get("properties", {}).get("datetime"),
+                           "eo:cloud_cover": feature.get("properties", {}).get("eo:cloud_cover")},
+        } for feature in features[:5]]
+    return {"area": "Mumbai coast", "bbox": bbox, "checked_at": now.isoformat(), "radar": radar, "optical": optical}
 
 
 def item(item_id: str) -> dict:

@@ -16,6 +16,66 @@ const REAL_SAR_SAMPLE = {
   bbox: [59.45519693247744, 22.671491235118914, 60.51277339248815, 23.723201581643035],
   quicklook: "samples/S1A_IW_20190616_140738_quicklook.png",
 };
+const LIVE_FEED = { scene: null, recentScenes: 0, optical: null };
+const ageLabel = (value) => {
+  const days = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 86400000));
+  return days < 1 ? "Published today" : days === 1 ? "1 day ago" : `${days} days ago`;
+};
+async function loadLiveCatalogue() {
+  const feed = $("#liveFeed");
+  if (!feed) return;
+  try {
+    const endpoint = window.OSI_PUBLIC_DEMO ? "/api/live-scenes" : "/api/data/live-scenes";
+    const response = await fetch(endpoint, { cache: "no-store" });
+    if (!response.ok) throw new Error(`catalogue returned HTTP ${response.status}`);
+    const snapshot = await response.json();
+    const radar = snapshot.radar || [];
+    if (!radar.length) throw new Error("no Sentinel-1 IW scenes found in the last 120 days");
+    const latest = radar[0];
+    const properties = latest.properties || {};
+    const preview = latest.assets?.rendered_preview?.href || latest.assets?.thumbnail?.href;
+    LIVE_FEED.scene = {
+      id: latest.id, start: properties.datetime, durationS: 25, bbox: latest.bbox,
+      quicklook: preview, platform: String(properties.platform || "Sentinel-1").replace("sentinel-", "Sentinel-"),
+      orbit: properties["sat:orbit_state"] || "unknown", sourceLabel: "Live catalogue",
+    };
+    LIVE_FEED.recentScenes = radar.length;
+    feed.classList.add("connected");
+    $("#liveSceneAge").textContent = ageLabel(properties.datetime);
+    $("#liveSceneTitle").textContent = `${LIVE_FEED.scene.platform} · ${LIVE_FEED.scene.orbit} orbit`;
+    $("#liveSceneMeta").textContent = `${new Date(properties.datetime).toLocaleString([], { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" })} UTC · Mumbai coast`;
+    $("#liveArchive").textContent = `Archive · ${radar.length} recent scenes`;
+    if (preview) {
+      $("#liveScenePreview").src = preview; $("#liveSceneOpen").href = preview; $("#liveSceneOpen").hidden = false;
+    }
+    LIVE_FEED.optical = snapshot.optical?.[0] || null;
+    if (LIVE_FEED.optical) {
+      const opticalProperties = LIVE_FEED.optical.properties || {};
+      const opticalPreview = LIVE_FEED.optical.assets?.rendered_preview?.href || LIVE_FEED.optical.assets?.thumbnail?.href;
+      const gapDays = Math.abs(new Date(opticalProperties.datetime) - new Date(properties.datetime)) / 86400000;
+      $("#liveOptical").textContent = `EO companion · ${gapDays.toFixed(1)} d · ${Number(opticalProperties["eo:cloud_cover"] || 0).toFixed(0)}% cloud`;
+      if (opticalPreview) {
+        $("#liveOpticalPreview").src = opticalPreview; $("#liveOpticalOpen").href = opticalPreview;
+        $("#liveOpticalOpen").hidden = false; $("#liveScenePair").classList.add("paired");
+      }
+    } else {
+      $("#liveOptical").textContent = "EO companion · inconclusive";
+    }
+    $("#liveSceneNote").textContent = window.OSI_PUBLIC_DEMO
+      ? "Live catalogue preview; the button below runs the verified judge replay. Full detection runs on the FastAPI monitor."
+      : "The service can stream this AOI, screen every slick candidate, then add weather, drift and AIS evidence.";
+    $("#btnReceiveSample").textContent = "View latest real radar image";
+    $("#btnReceiveMap").textContent = "View latest real radar image";
+    if (window.OSI_PUBLIC_DEMO) $("#health").textContent = "● Live catalogue connected";
+  } catch (error) {
+    $("#liveSceneAge").textContent = "Unavailable";
+    $("#liveSceneTitle").textContent = "Satellite catalogue could not be reached";
+    $("#liveSceneMeta").textContent = "The verified offline replay is still available.";
+    $("#liveArchive").textContent = "Archive · unavailable"; $("#liveOptical").textContent = "Optical · unavailable";
+    $("#liveSceneNote").textContent = error.message;
+  }
+}
+const activeReceptionSample = () => LIVE_FEED.scene?.quicklook && LIVE_FEED.scene?.bbox ? LIVE_FEED.scene : REAL_SAR_SAMPLE;
 const stageState = Object.fromEntries(PIPELINE_STAGES.map(([id]) => [id, "waiting"]));
 const replay = { result: null, index: -1, timer: null, frame: null, paused: false, active: false, kind: null, elapsedMs: 0, lastFrame: 0 };
 function notify(message, error = false) {
@@ -25,8 +85,8 @@ function notify(message, error = false) {
 $("#dismissNotice").onclick = () => $("#notice").hidden = true;
 function renderStageStatus() {
   const groups = window.OSI_PUBLIC_DEMO ? [
-    [["acquisition", "preprocessing"], "Receive image"], [["detection", "drift"], "Check for oil"],
-    [["ais"], "Match vessels"], [["evidence"], "Prepare report"],
+    [["acquisition", "preprocessing"], "Receive SAR"], [["detection"], "Check slick"],
+    [["drift"], "Wind + drift"], [["ais"], "Match AIS"], [["evidence"], "Evidence"],
   ] : PIPELINE_STAGES.map(([id, label]) => [[id], label]);
   const groupState = (ids) => {
     const states = ids.map((id) => stageState[id]);
@@ -390,10 +450,10 @@ function kpis() {
   $("#btnFit").disabled = !S.scene;
   $("#btnExport").disabled = !S.inv || isReception;
   $("#caseSummary").innerHTML = isReception ? [
-    `Sentinel-1A <b>IW GRD</b>`,
-    `Acquisition <b>${REAL_SAR_SAMPLE.start.slice(0, 19).replace("T", " ")} UTC</b>`,
-    `Slice <b>${REAL_SAR_SAMPLE.durationS} seconds</b>`,
-    `<b>Historic measured SAR</b>`
+    `${esc(S.scene?.platform || "Sentinel-1A")} <b>IW GRD</b>`,
+    `Acquisition <b>${esc(S.scene?.sensing_time?.slice(0, 19).replace("T", " ") || "unknown")} UTC</b>`,
+    `Slice <b>${S.scene?.duration_s || 25} seconds</b>`,
+    `<b>${esc(S.scene?.source_label || "Historic measured SAR")}</b>`
   ].map((s) => `<span>${s}</span>`).join("") : S.inv ? [
     `Latest image <b>${esc(S.scene?.sensing_time?.replace("T", " ") || "Waiting")}</b>`,
     `Images checked <b>${S.scene ? "1" : "0"}</b>`,
@@ -499,15 +559,16 @@ function receiveFrame(now) {
   if (!replay.lastFrame) replay.lastFrame = now;
   if (!replay.paused) replay.elapsedMs += Math.min(now - replay.lastFrame, 250) * Number($("#replaySpeed").value || 1);
   replay.lastFrame = now;
-  const fraction = Math.min(1, replay.elapsedMs / (REAL_SAR_SAMPLE.durationS * 1000));
+  const duration = activeReceptionSample().durationS;
+  const fraction = Math.min(1, replay.elapsedMs / (duration * 1000));
   setReceptionReveal(fraction);
   $("#acquisitionProgress").style.width = `${fraction * 100}%`;
-  $("#replayClock").textContent = replay.paused ? `Reception paused · ${Math.round(fraction * 100)}%` : `Receiving Sentinel-1 · ${Math.round(fraction * 100)}% · ${(replay.elapsedMs / 1000).toFixed(1)} / ${REAL_SAR_SAMPLE.durationS}s`;
+  $("#replayClock").textContent = replay.paused ? `Reception paused · ${Math.round(fraction * 100)}%` : `Receiving Sentinel-1 · ${Math.round(fraction * 100)}% · ${(replay.elapsedMs / 1000).toFixed(1)} / ${duration}s`;
   if (fraction >= 1) {
     replay.active = false; replay.frame = null; setStage("acquisition", "complete");
     $("#systemValue").textContent = "Received"; $("#operationState").textContent = "Received";
     $("#btnReplayPause").disabled = true; $("#btnReplayPause").textContent = "Pause";
-    $("#replayClock").textContent = `Product received · ${REAL_SAR_SAMPLE.durationS}s slice`;
+    $("#replayClock").textContent = `Product received · ${duration}s slice`;
     notify("Sentinel-1 IW product slice received.");
     return;
   }
@@ -515,11 +576,13 @@ function receiveFrame(now) {
 }
 function startRealReception() {
   stopReplayActivity(); resetResults(); resetStages();
+  const sample = activeReceptionSample();
   replay.kind = "reception"; replay.paused = false; replay.elapsedMs = 0; replay.lastFrame = 0;
-  S.inv = { id: "S1A-20190616-140738", name: "Sentinel-1 acquisition", mode: "sar-reception" };
+  S.inv = { id: sample.id, name: `${sample.platform || "Sentinel-1"} acquisition`, mode: "sar-reception" };
   S.scene = {
-    bbox: REAL_SAR_SAMPLE.bbox, quicklook: REAL_SAR_SAMPLE.quicklook, prob_overlay: null,
-    sensing_time: REAL_SAR_SAMPLE.start, detector: "not processed", processing_s: 0,
+    bbox: sample.bbox, quicklook: sample.quicklook, prob_overlay: null,
+    sensing_time: sample.start, detector: "not processed", processing_s: 0,
+    platform: sample.platform || "Sentinel-1A", duration_s: sample.durationS, source_label: sample.sourceLabel || "Historic measured SAR",
     synthetic: false, detections: [], age_estimate: { status: "not estimated", reason: "acquisition only" },
   };
   S.detection = null; renderScene(); kpis(); goto("dashboard");
@@ -795,3 +858,5 @@ if (window.OSI_PUBLIC_DEMO) {
   $("#btnAnalyze").title = "Analyse the selected bundled scene using its published baseline result";
   $("#health").textContent = "● Public replay ready";
 }
+loadLiveCatalogue();
+setInterval(loadLiveCatalogue, 300000);

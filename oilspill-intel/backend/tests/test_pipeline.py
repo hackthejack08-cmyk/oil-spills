@@ -59,6 +59,14 @@ def test_monitor_scan_queues_an_idempotent_cycle(monkeypatch):
     assert response.status_code == 200 and response.json()["id"] == "job_monitor"
     assert queued["kind"] == "sentinel1_monitor" and queued["body"].monitor_id == "mumbai-coast"
 
+
+def test_live_scene_snapshot_endpoint(monkeypatch):
+    from app.integrations import planetary
+    expected = {"area": "Mumbai coast", "radar": [{"id": "S1-test"}], "optical": [{"id": "S2-test"}]}
+    monkeypatch.setattr(planetary, "live_snapshot", lambda: expected)
+    response = client.get("/api/data/live-scenes")
+    assert response.status_code == 200 and response.json() == expected
+
 def test_ais_cleaning_drops_junk():
     raw = aisp.load_csv(str(config.DEMO_DIR / "synthetic_ais.csv"))
     clean, rep = aisp.clean(raw)

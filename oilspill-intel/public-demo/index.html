@@ -57,9 +57,26 @@
   <aside id="sidebar" tabindex="-1" aria-label="Investigation controls and evidence">
     <section id="page-dashboard" class="page active">
       <div class="operation-head"><span>Oil-spill monitor</span><b id="operationState">Ready</b></div>
+      <section id="liveFeed" class="live-feed" aria-label="Latest Sentinel-1 catalogue scene">
+        <div class="live-feed-head"><span><i></i> Near-real-time Sentinel-1</span><b id="liveSceneAge">Checking…</b></div>
+        <div id="liveScenePair" class="live-scene-pair">
+          <a id="liveSceneOpen" class="live-scene-image" href="#" target="_blank" rel="noreferrer" hidden>
+            <img id="liveScenePreview" alt="Latest Sentinel-1 radar preview over the Mumbai monitoring area"><span>SAR</span>
+          </a>
+          <a id="liveOpticalOpen" class="live-scene-image optical" href="#" target="_blank" rel="noreferrer" hidden>
+            <img id="liveOpticalPreview" alt="Time-and-area matched Sentinel-2 optical companion"><span>EO companion</span>
+          </a>
+        </div>
+        <strong id="liveSceneTitle">Looking for the latest Mumbai-coast radar scene…</strong>
+        <p id="liveSceneMeta">Connecting to the public satellite catalogue.</p>
+        <div class="live-checks" aria-label="Verification sources">
+          <span id="liveArchive">Archive · checking</span><span id="liveOptical">Optical · checking</span>
+        </div>
+        <small id="liveSceneNote">The live catalogue is separate from the verified replay below.</small>
+      </section>
       <div class="operation-card">
         <button id="btnRunReplay" class="primary">Scan for oil spills</button>
-        <button id="btnReceiveSample" class="secondary">View a real radar image</button>
+        <button id="btnReceiveSample" class="secondary">View latest real radar image</button>
         <ul class="automatic-inputs" aria-label="Automatic inputs">
           <li><b>Time</b><span>read from the image</span></li>
           <li><b>Wind and currents</b><span>loaded automatically</span></li>

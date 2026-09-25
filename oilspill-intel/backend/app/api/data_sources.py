@@ -49,6 +49,15 @@ def status():
     ]}
 
 
+@router.get("/live-scenes")
+def live_scenes():
+    """Current catalogue snapshot used by the operator dashboard."""
+    try:
+        return planetary.live_snapshot()
+    except Exception as exc:
+        raise HTTPException(502, f"satellite catalogue error: {exc}")
+
+
 # ---------------- Sentinel-1 -----------------------------------------------
 class S1Search(BaseModel):
     lon: float = Field(..., ge=-180, le=180); lat: float = Field(..., ge=-90, le=90)
