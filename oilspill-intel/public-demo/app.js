@@ -23,7 +23,15 @@ function notify(message, error = false) {
 }
 $("#dismissNotice").onclick = () => $("#notice").hidden = true;
 function renderStageStatus() {
-  $("#stageList").innerHTML = PIPELINE_STAGES.map(([id, label]) => `<li class="${stageState[id]}" aria-label="${esc(label)}: ${stageState[id]}">${esc(label)}</li>`).join("");
+  const groups = window.OSI_PUBLIC_DEMO ? [
+    [["acquisition", "preprocessing"], "Receive image"], [["detection", "drift"], "Check for oil"],
+    [["ais"], "Match vessels"], [["evidence"], "Prepare report"],
+  ] : PIPELINE_STAGES.map(([id, label]) => [[id], label]);
+  const groupState = (ids) => {
+    const states = ids.map((id) => stageState[id]);
+    return states.includes("failed") ? "failed" : states.includes("running") ? "running" : states.includes("partial") ? "partial" : states.every((state) => state === "complete") ? "complete" : "waiting";
+  };
+  $("#stageList").innerHTML = groups.map(([ids, label]) => { const status = groupState(ids); return `<li class="${status}" aria-label="${esc(label)}: ${status}">${esc(label)}</li>`; }).join("");
   const values = Object.values(stageState);
   $("#systemValue").textContent = values.includes("failed") ? "Review required" : values.includes("running") ? "Processing" : values.includes("partial") ? "Partial" : values.every((v) => v === "complete") ? "Complete" : "Ready";
   if ($("#operationState")) $("#operationState").textContent = $("#systemValue").textContent;
@@ -102,7 +110,7 @@ document.querySelectorAll("#nav button").forEach((b) => b.onclick = () => {
 const goto = (p) => document.querySelector(`#nav button[data-page=${p}]`).click();
 
 /* ---------------- health ---------------- */
-api("/api/health").then((h) => { $("#health").textContent = window.OSI_PUBLIC_DEMO ? "● Public replay ready" : `● API online · ${h.cnn_weights ? "weights present" : "baseline detector"}`; $("#healthBox").textContent = JSON.stringify(h, null, 1); $("#landWarning").hidden = h.land_mask_available !== false; })
+api("/api/health").then((h) => { $("#health").textContent = window.OSI_PUBLIC_DEMO ? "● Demo ready" : `● API online · ${h.cnn_weights ? "weights present" : "baseline detector"}`; $("#healthBox").textContent = JSON.stringify(h, null, 1); $("#landWarning").hidden = h.land_mask_available !== false; })
   .catch(() => ($("#health").textContent = "● API offline"));
 
 /* ---------------- uploads ---------------- */
@@ -370,7 +378,7 @@ function kpis() {
   $("#caseTitle").textContent = S.inv?.mode === "demo" ? "Arabian Sea continuous monitor" : S.inv?.name || "Oil spill monitoring";
   $("#caseId").textContent = S.inv?.mode === "demo" ? "Monitoring area · latest cycle" : S.inv ? S.inv.id : "New area";
   const isReception = S.inv?.mode === "sar-reception";
-  $("#dataBadge").textContent = S.inv ? isReception ? "Real SAR" : S.scene?.synthetic || S.ais?.synthetic ? "Synthetic data" : S.inv.mode === "demo" ? "Demo data" : "Operational data" : "No case";
+  $("#dataBadge").textContent = S.inv ? isReception ? "Real image" : S.scene?.synthetic || S.ais?.synthetic ? "Demo data" : S.inv.mode === "demo" ? "Demo data" : "Live data" : "Not started";
   $("#dataBadge").classList.toggle("la", S.inv?.mode === "demo");
   $("#dataBadge").classList.toggle("oil", isReception);
   $("#acquisitionValue").textContent = S.scene?.sensing_time ? S.scene.sensing_time.slice(0, 16).replace("T", " ") + "Z" : "—";
@@ -385,11 +393,10 @@ function kpis() {
     `Slice <b>${REAL_SAR_SAMPLE.durationS} seconds</b>`,
     `<b>Historic measured SAR</b>`
   ].map((s) => `<span>${s}</span>`).join("") : S.inv ? [
-    `Observed <b>${esc(S.scene?.sensing_time?.replace("T", " ") || "No scene loaded")}</b>`,
-    `Scenes scanned <b>${S.scene ? "1" : "0"}</b>`,
-    `Slicks detected <b>${S.scene?.detections?.length || 0}</b>`,
-    `Detector <b>${esc(S.scene?.detector || "Not run")}</b>`,
-    '<b>Unconfirmed · analyst review required</b>'
+    `Latest image <b>${esc(S.scene?.sensing_time?.replace("T", " ") || "Waiting")}</b>`,
+    `Images checked <b>${S.scene ? "1" : "0"}</b>`,
+    `Possible spills <b>${S.scene?.detections?.length || 0}</b>`,
+    '<b>Review required before action</b>'
   ].map((s) => `<span>${s}</span>`).join("") : "Choose an operation to begin.";
   renderCandidates();
 }

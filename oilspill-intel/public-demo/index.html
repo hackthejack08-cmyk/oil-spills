@@ -11,16 +11,16 @@
 <body>
 <a class="skip-link" href="#sidebar">Skip to investigation controls</a>
 <header class="rail">
-  <div class="brand">OSI <small>Continuous marine monitoring</small></div>
+  <div class="brand">OSI <small>Oil-spill alerts</small></div>
   <nav id="nav" aria-label="Investigation stages">
-    <button data-page="dashboard" class="active" aria-current="page">Monitoring</button>
-    <button data-page="satellite">SAR scene</button>
-    <button data-page="drift">Drift</button>
+    <button data-page="dashboard" class="active" aria-current="page">Home</button>
+    <button data-page="satellite">Image details</button>
+    <button data-page="drift">Drift details</button>
     <button data-page="ais">Vessel tracks</button>
-    <button data-page="ranking">Vessel leads</button>
+    <button data-page="ranking">Results</button>
     <button data-page="evidence">Evidence</button>
-    <button data-page="evaluation">Evaluation</button>
-    <button data-page="data">Data sources</button>
+    <button data-page="evaluation">Accuracy</button>
+    <button data-page="data">Data setup</button>
   </nav>
   <div class="rail-foot"><div class="status" id="health" role="status">Connecting…</div></div>
 </header>
@@ -28,38 +28,38 @@
 <div class="workspace-head">
   <div class="head-title"><h1 id="caseTitle">Oil spill investigation</h1><span id="caseId" class="case-ref">New case</span></div>
   <div class="head-actions">
-    <label class="case-picker">Area<select id="casePicker" aria-label="Monitoring area selector"><option value="">New monitoring area</option><option value="demo">Arabian Sea monitoring cycle</option><option value="reception">Sentinel-1 acquisition</option></select></label>
-    <div class="operational-meta"><span>Mode <b id="dataBadge" class="badge">No case</b></span><span>Acquired <b id="acquisitionValue">—</b></span><span>System <b id="systemValue" class="status-text">Ready</b></span></div>
-    <button id="btnExport" class="outline" disabled>Export evidence</button>
+    <label class="case-picker">Monitoring area<select id="casePicker" aria-label="Monitoring area selector"><option value="">Start new analysis</option><option value="demo">Run Arabian Sea demo</option><option value="reception">View real SAR sample</option></select></label>
+    <div class="operational-meta"><span>Data <b id="dataBadge" class="badge">Not started</b></span><span>Image time <b id="acquisitionValue">—</b></span><span>Status <b id="systemValue" class="status-text">Ready</b></span></div>
+    <button id="btnExport" class="outline" disabled>Download report</button>
   </div>
 </div>
-<div id="caseSummary" class="summary-strip">Upload a georeferenced SAR image or open the sample case.</div>
+<div id="caseSummary" class="summary-strip">Choose a demo or radar image to begin.</div>
 <div id="notice" class="notice" role="status" aria-live="polite" hidden><span id="noticeText"></span><button id="dismissNotice" aria-label="Dismiss message">×</button></div>
 <section class="stage-strip" aria-label="Investigation processing status">
-  <div class="stage-title"><b>Monitoring cycle</b><span id="replayClock">Waiting for acquisitions</span></div>
+  <div class="stage-title"><b>Scan progress</b><span id="replayClock">Waiting for new images</span></div>
   <ol id="stageList" class="stage-list"></ol>
   <div id="replayControls" class="replay-controls">
     <button id="btnReplayPause" class="map-button" disabled>Pause</button>
     <button id="btnReplayRestart" class="map-button">Scan now</button>
-    <label>Speed <select id="replaySpeed" aria-label="Replay speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select></label>
+    <label>Demo speed <select id="replaySpeed" aria-label="Replay speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select></label>
   </div>
   <div class="acquisition-track" aria-hidden="true"><i id="acquisitionProgress"></i></div>
 </section>
 <main>
   <div class="map-workspace">
-    <div class="map-heading"><span><b>Investigation map</b> <small>WGS84 · UTC</small></span><div class="map-tools"><button id="btnFit" class="map-button" disabled>Fit scene</button><label class="chk"><input type="checkbox" id="chkScene" checked> SAR</label><label class="chk"><input type="checkbox" id="chkEnhanced"> Contrast preview</label><label class="chk"><input type="checkbox" id="chkSlick" checked> Slick</label><label class="chk"><input type="checkbox" id="chkDriftLayers" checked> Drift</label><label class="chk"><input type="checkbox" id="chkAisLayers" checked> AIS</label></div></div>
+    <div class="map-heading"><span><b>Review map</b> <small>WGS84 · UTC</small></span><div class="map-tools"><button id="btnFit" class="map-button" disabled>Fit image</button><label class="chk"><input type="checkbox" id="chkScene" checked> Radar image</label><label class="chk"><input type="checkbox" id="chkEnhanced"> Enhanced view</label><label class="chk"><input type="checkbox" id="chkSlick" checked> Oil candidates</label><label class="chk"><input type="checkbox" id="chkDriftLayers" checked> Drift paths</label><label class="chk"><input type="checkbox" id="chkAisLayers" checked> Vessels</label></div></div>
     <div class="map-stage"><div id="map" aria-label="Oil-spill investigation map"></div>
-      <div id="mapEmpty" class="map-empty"><strong>Area monitor ready</strong><div class="map-start-actions"><button id="btnStartDemo" class="primary">Scan available scenes</button><button id="btnReceiveMap" class="secondary">Receive SAR sample</button></div></div>
+      <div id="mapEmpty" class="map-empty"><strong>Area monitor ready</strong><div class="map-start-actions"><button id="btnStartDemo" class="primary">Scan for oil spills</button><button id="btnReceiveMap" class="secondary">View real radar image</button></div></div>
       <details class="legend-wrap"><summary>Map legend</summary><div id="legend" class="legend"></div></details>
     </div>
-    <section class="case-bottom" aria-label="Candidate overview"><div class="section-heading"><h2>Candidate vessels</h2><span class="muted small">Evidence match ≠ responsibility</span></div><div id="candidateOverview" class="table-scroll"><p class="empty-note">Candidates appear after satellite analysis, drift modelling and AIS correlation.</p></div></section>
+    <section class="case-bottom" aria-label="Candidate overview"><div class="section-heading"><h2>Possible source vessels</h2><span class="muted small">Investigation leads—not proof</span></div><div id="candidateOverview" class="table-scroll"><p class="empty-note">Possible source vessels appear after the scan completes.</p></div></section>
   </div>
   <aside id="sidebar" tabindex="-1" aria-label="Investigation controls and evidence">
     <section id="page-dashboard" class="page active">
-      <div class="operation-head"><span>Monitoring</span><b id="operationState">Ready</b></div>
+      <div class="operation-head"><span>Oil-spill monitor</span><b id="operationState">Ready</b></div>
       <div class="operation-card">
-        <button id="btnRunReplay" class="primary">Scan available scenes</button>
-        <button id="btnReceiveSample" class="secondary">Receive real SAR sample</button>
+        <button id="btnRunReplay" class="primary">Scan for oil spills</button>
+        <button id="btnReceiveSample" class="secondary">View a real radar image</button>
         <div class="sample-meta">
           <span><b>Sentinel-1A</b> · IW GRD</span>
           <span>16 Jun 2019 · 25 s</span>
@@ -93,7 +93,8 @@
         </ol>
         <p class="small muted">Attribution is a decision-support result and requires analyst review.</p>
       </details>
-      <details><summary>Advanced / manual workflow</summary>
+      <details><summary>Advanced tools</summary>
+        <div class="advanced-links"><a href="#" onclick="goto('satellite');return false">Image settings</a><a href="#" onclick="goto('drift');return false">Drift settings</a><a href="#" onclick="goto('ais');return false">Vessel-track settings</a><a href="#" onclick="goto('data');return false">Data connections</a></div>
         <button id="btnNew" class="secondary">New real-data investigation</button>
         <label>Open existing <select id="invSel"><option value="">— select —</option></select></label>
       </details>
@@ -154,7 +155,7 @@
     </section>
 
     <section id="page-ranking" class="page">
-      <h2>Vessel Ranking</h2>
+      <h2>Possible Source Vessels</h2>
       <p class="warn small">Scores express <b>correlation with available evidence</b>. They are not proof of responsibility.</p>
       <div id="rankTable" class="table-scroll"><p class="empty-note">Run AIS correlation to review candidates.</p></div>
     </section>
@@ -175,34 +176,34 @@
     </section>
 
     <section id="page-evidence" class="page">
-      <h2>Evidence View</h2>
+      <h2>Evidence Report</h2>
       <div id="evidencePanel"><p class="empty-note">Select a candidate from the table below the map.</p></div>
-      <p class="small muted"><b>Why this exists:</b> the ledger proves which inputs and results were used and whether they changed. It is not an accuracy score; measured performance is under Evaluation.</p>
+      <p class="small muted"><b>Why this exists:</b> the ledger proves which inputs and results were used and whether they changed. It is not an accuracy score; measured performance is under Accuracy.</p>
       <details><summary>Evidence ledger (SHA-256)</summary><div id="ledger" class="small table-scroll"></div></details>
     </section>
 
     <section id="page-evaluation" class="page">
-      <h2>Model Evaluation</h2>
+      <h2>Accuracy &amp; Testing</h2>
       <p class="warn small"><b>Current status:</b> experimental screening baseline—not validated for unattended operational alerts.</p>
       <div class="card">
-        <h3>Real Sentinel-1 screening benchmark</h3>
-        <p class="small muted">Reproduced on 19 usable GlobalOSD-SAR point labels: 10 oil positives and 9 look-alikes. Threshold 0.50; a hit is a candidate within 8 km of the labelled point.</p>
+        <h3>Tested on real Sentinel-1 images</h3>
+        <p class="small muted">Test set: 10 labelled oil images and 9 non-oil look-alikes from GlobalOSD-SAR.</p>
         <table>
           <tbody>
-            <tr><th>Metric</th><th>Measured result</th></tr>
-            <tr><td>Oil recall</td><td><b>80.0%</b> (8/10)</td></tr>
-            <tr><td>False-alarm rate</td><td><b>44.4%</b> (4/9)</td></tr>
-            <tr><td>Derived precision</td><td><b>66.7%</b> (8/12 alerts)</td></tr>
-            <tr><td>Overall sample accuracy</td><td><b>68.4%</b> (13/19)</td></tr>
-            <tr><td>Oil-likelihood AUC</td><td><b>0.622</b></td></tr>
+            <tr><th>Question</th><th>Measured result</th></tr>
+            <tr><td>How many labelled oil scenes were found?</td><td><b>8 of 10</b> (80%)</td></tr>
+            <tr><td>How many non-oil scenes caused an alert?</td><td><b>4 of 9</b> (44.4%)</td></tr>
+            <tr><td>How many alerts were correct?</td><td><b>8 of 12</b> (66.7%)</td></tr>
+            <tr><td>How many test scenes were classified correctly?</td><td><b>13 of 19</b> (68.4%)</td></tr>
           </tbody>
         </table>
+        <details><summary>Test method and technical metric</summary><p class="small">Threshold 0.50; a detection counts as a hit within 8 km of the labelled point. Oil-likelihood AUC: <b>0.622</b>.</p></details>
       </div>
       <div class="card">
         <h3>Not measured yet</h3>
-        <p><b>Segmentation IoU / Dice:</b> unavailable because this sample has point labels, not pixel masks.</p>
-        <p><b>Drift forecast error:</b> not yet validated against observed drifter tracks.</p>
-        <p><b>Vessel-ranking accuracy:</b> not yet tested on confirmed polluter cases.</p>
+        <p><b>Pixel-level oil outline:</b> not measured because this sample marks locations, not complete oil boundaries.</p>
+        <p><b>Drift forecast:</b> not yet compared with observed drifter tracks.</p>
+        <p><b>Vessel matching:</b> not yet tested on confirmed polluter cases.</p>
       </div>
       <div class="card">
         <h3>Judge validation pack</h3>
