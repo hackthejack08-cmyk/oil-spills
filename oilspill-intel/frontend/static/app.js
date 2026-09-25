@@ -245,6 +245,36 @@ async function analyzeScene() {
     notify(`${scene.detections.length} suspected object(s) detected. Review before running drift.`); refreshInvestigations();
   } catch (e) { setStage("acquisition", "failed"); notify(e.message, true); } finally { $("#btnAnalyze").disabled = false; }
 }
+function directionFromTrack(track) {
+  if (!track || track.length < 2) return null;
+  const [lon1, lat1] = track[0], [lon2, lat2] = track.at(-1);
+  const east = (lon2 - lon1) * Math.cos((lat1 + lat2) * Math.PI / 360);
+  const degrees = (Math.atan2(east, lat2 - lat1) * 180 / Math.PI + 360) % 360;
+  const cardinal = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"][Math.round(degrees / 45) % 8];
+  return { degrees, cardinal };
+}
+function renderContext() {
+  const panel = $("#contextPanel"), s = S.scene;
+  if (!panel || !s) { if (panel) panel.hidden = true; return; }
+  const m = s.metadata || {}, b = s.bbox || [];
+  const lon = m.centre?.lon ?? (b.length === 4 ? (b[0] + b[2]) / 2 : null);
+  const lat = m.centre?.lat ?? (b.length === 4 ? (b[1] + b[3]) / 2 : null);
+  const location = m.location_label || (lat == null ? "Unavailable" : `${Math.abs(lat).toFixed(4)}°${lat >= 0 ? "N" : "S"}, ${Math.abs(lon).toFixed(4)}°${lon >= 0 ? "E" : "W"}`);
+  const e = S.drift?.environment || {};
+  const forecast = e.forecast_toward ? { cardinal: e.forecast_toward, degrees: e.forecast_toward_deg } : directionFromTrack(S.drift?.forward?.centre_track);
+  const windSpeed = e.wind_speed_ms ?? S.drift?.wind_at_slick_ms;
+  const wind = windSpeed != null ? `${fmt(windSpeed, 1)} m/s${e.wind_from ? ` · from ${esc(e.wind_from)} (${fmt(e.wind_from_deg, 0)}°)` : " · direction not stored in this replay"}` : "Fetched after a slick is selected";
+  const current = e.current_speed_ms != null ? `${fmt(e.current_speed_ms, 2)} m/s · toward ${esc(e.current_toward || "–")} (${fmt(e.current_toward_deg, 0)}°)` : S.drift ? "Applied by model · vector not stored in this replay" : "Fetched after a slick is selected";
+  panel.hidden = false;
+  panel.innerHTML = `<h3>Automatic image context</h3><div class="context-grid">
+    <div><span>Location</span><b>${esc(location)}</b></div><div><span>Image time</span><b>${esc(s.sensing_time || "Missing metadata")}</b></div>
+    <div><span>Satellite / image</span><b>${esc(m.platform || s.platform || "Uploaded SAR GeoTIFF")}${m.orbit_pass && m.orbit_pass !== "unknown" ? " · " + esc(m.orbit_pass) : ""}</b></div>
+    <div><span>Footprint</span><b>${b.length === 4 ? `${fmt(b[0], 3)}, ${fmt(b[1], 3)} → ${fmt(b[2], 3)}, ${fmt(b[3], 3)}` : "Unavailable"}</b></div>
+    <div><span>Wind at slick</span><b>${wind}</b></div><div><span>Surface current</span><b>${current}</b></div>
+    <div><span>Forecast direction</span><b>${forecast ? `${esc(forecast.cardinal)} · ${fmt(forecast.degrees, 0)}°` : "Available after forecast"}</b></div>
+    <div><span>Image format</span><b>${esc(m.crs || "Georeferenced")}${m.width_px ? ` · ${m.width_px}×${m.height_px}px` : ""}</b></div>
+  </div><p class="context-source">Source: ${esc(m.source || s.source_label || "GeoTIFF metadata")}${e.wind_source ? ` · Wind: ${esc(e.wind_source)} · Current: ${esc(e.current_source)}` : ""}</p>`;
+}
 function renderScene() {
   const s = S.scene; const b = s.bbox; const bounds = [[b[1], b[0]], [b[3], b[2]]];
   if (layers.scene) map.removeLayer(layers.scene); if (layers.prob) map.removeLayer(layers.prob);
@@ -264,6 +294,7 @@ function renderScene() {
     ${d.lookalike_penalties.length ? "<b>look-alike rules:</b> " + d.lookalike_penalties.map((p) => p.rule).join(", ") : "no look-alike rule triggered"}<br>
     <button class="primary" onclick="selectDet('${d.id}')">Use this detection for drift</button></div>`).join("") : '<p class="empty-note">No suspected slick found at the current detector threshold. This does not prove the scene is oil-free.</p>';
   if (!S.detection && s.detections.length) S.detection = s.detections.reduce((a, b) => (a.oil_likelihood > b.oil_likelihood ? a : b));
+  renderContext();
   kpis();
 }
 window.selectDet = (id) => {
@@ -311,6 +342,7 @@ function renderDrift() {
     Wind at slick ${d.wind_at_slick_ms} m/s (modelled) <span class="muted">${d.wind_at_slick_ms < 2.5 || d.wind_at_slick_ms > 10 ? "⚠ outside 2.5–10 m/s detection window" : "✓ inside 2.5–10 m/s detection window"}</span><br>
     <span class="muted small">${d.origin_window.note}</span></div>`;
   $("#driftParams").textContent = JSON.stringify(d.params, null, 1);
+  renderContext();
   kpis();
 }
 function drawVectors(h) {
@@ -433,6 +465,7 @@ function resetResults() {
   for (const key of ["scene", "prob"]) { if (layers[key]) map.removeLayer(layers[key]); layers[key] = null; }
   layers.slick.clearLayers();
   $("#sceneInfo").replaceChildren(); $("#detList").replaceChildren();
+  $("#contextPanel").hidden = true; $("#contextPanel").replaceChildren();
   S.timeline = []; $("#timeline").replaceChildren();
 }
 function renderCandidates() {

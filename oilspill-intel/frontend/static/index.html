@@ -91,12 +91,14 @@
         </div>
         <a class="sample-file" href="samples/S1A_IW_20190616_140738_real_sample.tif" download>Download GeoTIFF <span>4.5 MB</span></a>
       </div>
+      <section id="contextPanel" class="context-panel" aria-live="polite" hidden></section>
       <div class="kpis" id="kpis"></div>
       <div class="technical-tools">
       <h3>Analyse another SAR scene</h3>
       <div class="image-workflow">
         <label>SAR GeoTIFF <input type="file" id="autoSceneFile" accept=".tif,.tiff"></label>
         <p class="sample-download"><a id="sampleSceneDownload" href="/api/demo/sample-scene" download="OSI_sample_20250314.tif">Download test image</a><span>28.4 MB · synthetic</span></p>
+        <p class="sample-download"><a href="samples/OSI_judge_validation_pack.zip" download>Download sample TIFF folder</a><span>10 measured scenes · positive + negative</span></p>
         <button id="btnAutoRun" class="primary">Analyse image</button>
         <div id="autoProgress" class="small muted" role="status"></div>
         <small>Runs detection, drift reconstruction, vessel matching and evidence export. Visual enhancement never changes the detection input.</small>

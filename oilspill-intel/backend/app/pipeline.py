@@ -36,6 +36,17 @@ def _parse_time(s: Optional[str]) -> Optional[datetime]:
     return t if t.tzinfo else t.replace(tzinfo=timezone.utc)
 
 
+def _track_direction(track: list) -> tuple[Optional[float], Optional[str]]:
+    if len(track) < 2:
+        return None, None
+    lon1, lat1 = track[0][:2]; lon2, lat2 = track[-1][:2]
+    east = (lon2 - lon1) * np.cos(np.radians((lat1 + lat2) / 2))
+    north = lat2 - lat1
+    degrees = float(np.degrees(np.arctan2(east, north)) % 360)
+    cardinal = ("N", "NE", "E", "SE", "S", "SW", "W", "NW")[int((degrees + 22.5) // 45) % 8]
+    return round(degrees, 1), cardinal
+
+
 # --------------------------------------------------------------------------- #
 def create_investigation(name: str, mode: str = "demo", notes: str = "") -> dict:
     inv_id = _uid("inv")
@@ -95,10 +106,19 @@ def analyze_scene(inv_id: str, scene_path: str, sensing_time: Optional[str] = No
             db.add_evidence(c, inv_id, "detection", det_id, d, _uid("ev"))
             detections.append(d)
         c.execute("UPDATE investigations SET status='scene_analyzed' WHERE id=?", (inv_id,))
+    centre_lon, centre_lat = (minlon + maxlon) / 2, (minlat + maxlat) / 2
+    location = f"{abs(centre_lat):.4f}°{'N' if centre_lat >= 0 else 'S'}, {abs(centre_lon):.4f}°{'E' if centre_lon >= 0 else 'W'}"
     out = {"scene_id": scene_id, "model_run_id": run_id, "detector": detector, "sensing_time": sensing,
            "synthetic": scene.meta.get("synthetic", "false") == "true",
            "bbox": [minlon, minlat, maxlon, maxlat], "quicklook": f"/renders/{scene_id}_vv.png",
            "prob_overlay": f"/renders/{scene_id}_prob.png", "detections": detections,
+           "metadata": {"file_name": Path(scene_path).name, "platform": scene.meta.get("platform", "Sentinel-1"),
+                        "orbit_pass": scene.meta.get("orbit_pass", "unknown"),
+                        "polarisation": scene.meta.get("polarisation", "unknown"), "crs": str(scene.crs),
+                        "width_px": scene.shape[1], "height_px": scene.shape[0],
+                        "centre": {"lon": round(centre_lon, 6), "lat": round(centre_lat, 6)},
+                        "location_label": location,
+                        "source": scene.meta.get("attribution") or scene.meta.get("note") or "uploaded GeoTIFF"},
            "processing_s": round(time.time() - t0, 2),
            "age_estimate": {"status": "unavailable", "reason": "Spill age is not observable from a single SAR scene; "
                             "hindcast is run over a 1–%d h age window instead." % config.DRIFT_MAX_HOURS}}
@@ -130,11 +150,19 @@ def hindcast(inv_id: str, detection_id: str, forcing_path: str, hours: int = con
     pts = np.asarray(pts[:300])
     back = drift.simulate(forcing, pts[:, 0], pts[:, 1], t_obs, hours, backward=True)
     fwd = drift.simulate(forcing, pts[:, 0], pts[:, 1], t_obs, forward_hours, backward=False) if forward_hours else None
-    wind = forcing.wind_at(t_obs, g["centroid_lon"], g["centroid_lat"])
+    environment = forcing.conditions_at(t_obs, g["centroid_lon"], g["centroid_lat"])
+    forecast_deg, forecast_cardinal = _track_direction(fwd.centre_track if fwd else [])
+    environment.update({"sampled_at": t_obs.isoformat(),
+                        "sampled_position": {"lon": g["centroid_lon"], "lat": g["centroid_lat"]},
+                        "wind_source": forcing.source.get("wind_source", "forcing file"),
+                        "current_source": forcing.source.get("current_source", "forcing file"),
+                        "forecast_toward_deg": forecast_deg, "forecast_toward": forecast_cardinal})
+    wind = environment["wind_speed_ms"]
     run_id = _uid("drf")
     result = {"drift_run_id": run_id, "detection_id": detection_id, "t_obs": t_obs.isoformat(), "backward": {"hypotheses": back.hypotheses, "centre_track": back.centre_track},
               "forward": None if fwd is None else {"hypotheses": fwd.hypotheses, "centre_track": fwd.centre_track},
-              "params": back.params, "forcing_source": forcing.source, "wind_at_slick_ms": round(wind, 2),
+              "params": back.params, "forcing_source": forcing.source, "environment": environment,
+              "wind_at_slick_ms": round(wind, 2),
               "origin_window": {"earliest": (t_obs - timedelta(hours=hours)).isoformat(), "latest": (t_obs - timedelta(hours=1)).isoformat(),
                                 "note": "Release time is unobservable from one scene; every hour in this window is a hypothesis with its own uncertainty ellipse."}}
     with db.conn() as c:

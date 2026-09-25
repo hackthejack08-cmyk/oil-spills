@@ -109,6 +109,9 @@ def test_full_demo_chain_ranks_culprit_top1():
     h = j["drift"]["backward"]["hypotheses"][3]
     d_km = aisp.haversine_km(h["centre"][0], h["centre"][1], truth["origin_lon"], truth["origin_lat"])
     assert d_km < 6, d_km
+    assert j["scene"]["metadata"]["location_label"] and j["scene"]["metadata"]["crs"] == "EPSG:4326"
+    assert j["drift"]["environment"]["wind_speed_ms"] > 0
+    assert j["drift"]["environment"]["forecast_toward"] in {"N", "NE", "E", "SE", "S", "SW", "W", "NW"}
     ev = client.get(f"/api/evidence/{j['investigation']['id']}").json(); assert ev["items"] and all(len(i["sha256"]) == 64 for i in ev["items"])
     # Reopening must survive a server restart without manufacturing sparse scenes.
     from app import pipeline

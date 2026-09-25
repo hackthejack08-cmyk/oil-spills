@@ -62,8 +62,21 @@ class Forcing:
         return tuple(self._f[k](pts) for k in ("uo", "vo", "u10", "v10"))
 
     def wind_at(self, t: datetime, lon: float, lat: float) -> float:
-        _, _, u, v = self.sample(t, np.array([lon]), np.array([lat]))
-        return float(np.hypot(u[0], v[0]))
+        return self.conditions_at(t, lon, lat)["wind_speed_ms"]
+
+    def conditions_at(self, t: datetime, lon: float, lat: float) -> dict:
+        """Human-readable forcing sampled at one position and time."""
+        uo, vo, u10, v10 = (float(v[0]) for v in self.sample(t, np.array([lon]), np.array([lat])))
+        cardinal = lambda deg: ("N", "NE", "E", "SE", "S", "SW", "W", "NW")[int((deg + 22.5) // 45) % 8]
+        toward = lambda east, north: float(np.degrees(np.arctan2(east, north)) % 360)
+        wind_from = toward(-u10, -v10)
+        current_toward = toward(uo, vo)
+        return {
+            "wind_speed_ms": round(float(np.hypot(u10, v10)), 2),
+            "wind_from_deg": round(wind_from, 1), "wind_from": cardinal(wind_from),
+            "current_speed_ms": round(float(np.hypot(uo, vo)), 3),
+            "current_toward_deg": round(current_toward, 1), "current_toward": cardinal(current_toward),
+        }
 
     @classmethod
     def from_netcdf(cls, path: str) -> "Forcing":

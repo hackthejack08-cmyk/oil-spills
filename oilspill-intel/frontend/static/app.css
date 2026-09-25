@@ -312,6 +312,13 @@ main { min-height: 0; flex: 1; display: flex; }
 .sample-download { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: -2px 0 13px; }
 .sample-download a { font-weight: 600; }
 .sample-download span { color: var(--muted); font-size: 10px; white-space: nowrap; }
+.context-panel { margin: 10px 0; padding: 10px; border: 1px solid var(--line); background: #f7fbfc; }
+.context-panel h3 { margin: 0 0 8px; font-size: 13px; }
+.context-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.context-grid div { min-width: 0; padding: 7px; border: 1px solid var(--line); background: white; }
+.context-grid span { display: block; margin-bottom: 2px; color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: .03em; }
+.context-grid b { display: block; overflow-wrap: anywhere; font-size: 11px; line-height: 1.25; }
+.context-source { margin: 8px 0 0; color: var(--muted); font-size: 9px; line-height: 1.3; }
 .demo-only { display: none; margin: 8px 0 0; color: var(--muted); font-size: 10px; }
 .public-demo .demo-only { display: block; }
 .public-demo-banner { display: none !important; }

@@ -97,6 +97,9 @@ def test_build_forcing_produces_drift_compatible_netcdf(tmp_path, monkeypatch):
     f = Forcing.from_netcdf(str(out))
     w = f.wind_at(datetime(2025, 3, 14, 1, 12, tzinfo=timezone.utc), 70.5, 19.5)
     assert 5.5 < w < 5.7                                     # |(5, 2.5)| = 5.59 m/s
+    conditions = f.conditions_at(datetime(2025, 3, 14, 1, 12, tzinfo=timezone.utc), 70.5, 19.5)
+    assert conditions["wind_from"] == "SW" and conditions["current_toward"] == "SE"
+    assert conditions["current_speed_ms"] == pytest.approx(0.224, abs=0.001)
     ds = xr.open_dataset(out)
     assert not np.isnan(ds.uo.values).any()                  # land cell filled, no NaN reaches the drift model
 
