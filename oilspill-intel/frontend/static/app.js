@@ -131,6 +131,23 @@ async function analyzeScene() {
   $("#btnAnalyze").disabled = true;
   resetStages(); setStage("acquisition", "running");
   try {
+    if (window.OSI_PUBLIC_DEMO) {
+      let scene;
+      if (S.inv?.mode === "sar-reception") {
+        const response = await fetch("samples/S1A_IW_20190616_140738_analysis.json");
+        if (!response.ok) throw new Error("The published SAR analysis result could not be loaded.");
+        scene = await response.json();
+      } else {
+        const result = await api("/api/demo/run", {});
+        S.inv = result.investigation; scene = result.scene;
+      }
+      clearDownstream(); S.scene = scene; S.detection = null;
+      renderScene(); log(`published baseline analysis loaded → ${scene.detections.length} candidate(s)`);
+      setStage("acquisition", "complete"); setStage("preprocessing", "complete");
+      setStage("detection", scene.detections.length ? "complete" : "partial");
+      notify(`${scene.detections.length} unconfirmed dark-feature candidate(s) found. Scores require analyst review.`);
+      return;
+    }
     const pending = $("#sceneFile").files[0];
     if (pending) await upload("scene", pending, $("#sceneSel"));
     await ensureInv(); notify("Analysing radar pixels. This may take a moment…");
@@ -497,6 +514,7 @@ function startRealReception() {
     synthetic: false, detections: [], age_estimate: { status: "not estimated", reason: "acquisition only" },
   };
   S.detection = null; renderScene(); kpis(); goto("dashboard");
+  if (window.OSI_PUBLIC_DEMO) addOpt($("#sceneSel"), "real-sar-sample", "Received Sentinel-1 measured sample", true);
   setReceptionReveal(0); setStage("acquisition", "running");
   $("#casePicker").value = "reception"; $("#btnReplayPause").disabled = false; $("#btnReplayPause").textContent = "Pause";
   $("#btnReplayRestart").textContent = "Restart";
@@ -760,8 +778,11 @@ if (window.OSI_PUBLIC_DEMO) {
   $("#sampleSceneDownload").href = "samples/OSI_sample_20250314.tif";
   $("#autoSceneFile").title = "Upload the downloadable sample to replay its verified result";
   $("#btnAutoRun").title = "The static demo accepts the downloadable sample; arbitrary GeoTIFFs need the full deployment";
-  ["btnNew", "btnAnalyze", "btnDrift", "btnAis", "btnForcing", "btnAisFetch", "btnS1Search"].forEach((id) => {
+  ["btnNew", "btnDrift", "btnAis", "btnForcing", "btnAisFetch", "btnS1Search"].forEach((id) => {
     const control = document.getElementById(id); if (control) { control.disabled = true; control.title = "Available in the full FastAPI deployment"; }
   });
+  $("#sceneFile").disabled = true;
+  $("#sceneFile").title = "The public demo analyses its bundled measured sample; arbitrary GeoTIFFs need the full deployment";
+  $("#btnAnalyze").title = "Analyse the selected bundled scene using its published baseline result";
   $("#health").textContent = "● Public replay ready";
 }

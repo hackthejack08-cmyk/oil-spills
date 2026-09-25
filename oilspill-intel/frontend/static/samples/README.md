@@ -8,3 +8,5 @@
 - Pixel source: Microsoft Planetary Computer; calibrated to sigma-zero by this repository
 
 The GeoTIFF is historic measured SAR data, not a live feed. The PNG is a browser quicklook derived from band 1. The progressive reveal in the UI replays the product's acquisition interval; it does not claim real-time satellite downlink latency.
+
+`S1A_IW_20190616_140738_analysis.json` and its score-overlay PNG are the published output of this repository's baseline detector on that exact GeoTIFF. They let the static public site demonstrate analysis without pretending that Vercel is running the Python model. Regenerate them with `python tools/export_real_sar_result.py`.
