@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="OSI technical documentation: implementation, data provenance, evaluation and a reproducible testing guide for SIH26143.">
-<title>OSI · Technical documentation</title>
+<meta name="description" content="CodeCracker Dragons: technical documentation, data sources, evaluation and testing guide for SIH26143.">
+<title>CodeCracker Dragons · Technical documentation</title>
 <style>
 :root{color-scheme:light;--ink:#16323e;--muted:#536771;--line:#d4dfe2;--accent:#137780}
 *{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:24px}body{margin:0;background:#f3f6f6;color:var(--ink);font:16px/1.65 system-ui,-apple-system,"Segoe UI",sans-serif}a{color:#086570;text-underline-offset:3px}a:hover{color:#003e47}a:focus-visible,button:focus-visible{outline:3px solid #c47710;outline-offset:4px}
@@ -14,21 +14,21 @@
 </style>
 </head>
 <body>
-<header class="top"><strong>OSI / ENGINEERING NOTES</strong><div><a href="./" target="_blank" rel="noopener">Open application ↗</a> &nbsp; <a href="https://github.com/hackthejack08-cmyk/oil-spills/tree/main/oilspill-intel" target="_blank" rel="noopener">Source code ↗</a></div></header>
+<header class="top"><strong>CodeCracker Dragons</strong><div><a href="./" target="_blank" rel="noopener">Open application ↗</a> &nbsp; <a href="https://github.com/hackthejack08-cmyk/oil-spills/tree/main/oilspill-intel" target="_blank" rel="noopener">Source code ↗</a></div></header>
 <div class="layout">
 <nav aria-label="Document sections"><b>In this document</b><a href="#purpose">Problem &amp; scope</a><a href="#status">What works today</a><a href="#workflow">Processing workflow</a><a href="#data">Data &amp; inputs</a><a href="#brief">Response brief</a><a href="#evaluation">Measured results</a><a href="#testing">Testing guide</a><a href="#engineering">Run the backend</a><a href="#limits">Limits &amp; next steps</a><a href="#references">References</a></nav>
 <article>
 <div class="eyebrow">CodeCracker Dragons · SIH26143</div>
-<h1>Oil-spill intelligence,<br>from observation to review.</h1>
+<h1>Oil-spill monitoring</h1>
 <p class="lead">A suspected slick has appeared offshore. Where was it observed, where might it move, and which vessels need investigation?</p>
-<p>OSI brings radar imagery, drift estimates and historical vessel tracks into one investigation view. The response brief turns those results into a readable handoff for a Coast Guard, port or pollution-response officer.</p>
+<p>Our tool brings radar imagery, drift estimates and historical vessel tracks into one investigation view. The response brief turns those results into a readable handoff for a Coast Guard, port or pollution-response officer.</p>
 <p class="meta">Technical documentation · 26 September 2026 · Prototype implementation</p>
 <p class="note">The public site combines live catalogue previews with a saved, labelled demonstration. It is not an operational surveillance service. A catalogue image is not automatically a detected oil spill.</p>
 <button class="print" type="button" onclick="window.print()">Print / save as PDF</button>
 
 <section id="purpose"><h2>1. Problem and scope</h2>
 <p>A dark feature on radar is only a starting point. An investigator must establish its location and observation time, consider look-alikes, reconstruct possible movement and inspect traffic near plausible release locations.</p>
-<p>The problem we address is the work needed to connect these steps and explain the result. OSI keeps scene identifiers, timing, candidate geometry, model assumptions and vessel evidence together. It does not establish legal responsibility or replace field confirmation.</p>
+<p>The problem we address is the work needed to connect these steps and explain the result. The application keeps scene identifiers, timing, candidate geometry, model assumptions and vessel evidence together. It does not establish legal responsibility or replace field confirmation.</p>
 <p>Satellite oil-spill monitoring, drift modelling and vessel correlation already exist. <a href="https://emsa.europa.eu/csn-menu.html">EMSA CleanSeaNet</a> combines these capabilities operationally. Our contribution is a small, inspectable implementation with multiple release-time hypotheses, visible evidence gaps and a handoff brief—not a claim to have invented the overall workflow.</p></section>
 
 <section id="status"><h2>2. What works today</h2>

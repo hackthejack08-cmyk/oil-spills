@@ -2,23 +2,25 @@
 
 ## Links to include
 
-- Prototype: https://public-demo-one.vercel.app/
-- Technical documentation: https://public-demo-one.vercel.app/technical-documentation
+- Prototype: https://codecracker-dragons.vercel.app/
+- Technical documentation: https://codecracker-dragons.vercel.app/technical-documentation
 - GitHub: https://github.com/hackthejack08-cmyk/oil-spills/tree/main/oilspill-intel
 
 Use the documentation URL as a hyperlink labelled **Technical documentation** in the PPT/PDF. It is also linked inside the website. Test each link signed out before submitting. The YouTube field should contain the video URL, not the GitHub URL.
 
+Existing links on `public-demo-one.vercel.app` remain available.
+
 ## Idea title
 
-OSI: Satellite Oil-Spill Screening, Drift Analysis and AIS Investigation Support
+CodeCracker Dragons: Oil-Spill Screening, Drift Analysis and AIS Investigation
 
 ## Opening hook
 
-A suspected slick appears offshore. Where was it observed, where might it move, and which vessels should an investigator examine first? OSI brings the image, drift estimates and historical vessel evidence into one review workflow.
+A suspected slick appears offshore. Where was it observed, where might it move, and which vessels should an investigator examine first? Our tool brings the image, drift estimates and historical vessel evidence into one review workflow.
 
 ## Idea description
 
-OSI is an oil-spill investigation prototype for Coast Guard, port and marine pollution-response teams. It connects georeferenced Sentinel-1 SAR screening, possible release-window reconstruction, forward drift estimates and historical AIS correlation. Its purpose is to help an analyst connect the evidence, understand what is uncertain and hand the case to the next officer.
+CodeCracker Dragons is our team's oil-spill investigation prototype for Coast Guard, port and marine pollution-response teams. It connects georeferenced Sentinel-1 SAR screening, possible release-window reconstruction, forward drift estimates and historical AIS correlation. Its purpose is to help an analyst connect the evidence, understand what is uncertain and hand the case to the next officer.
 
 The implemented baseline identifies candidate dark regions and applies geometry, contrast and look-alike checks. The analysis backend can retrieve environmental data for the scene's location and time, evaluate multiple release-age hypotheses and rank vessel leads using spatial, temporal and trajectory evidence. Missing or inferred AIS positions are exposed rather than treated as confirmed observations. Sentinel-2 and NASA GIBS imagery provide optical context; automated SAR–EO oil confirmation is not yet implemented.
 
@@ -30,7 +32,7 @@ The next development steps are a larger incident-separated detector evaluation, 
 
 ## Abstract / summary
 
-OSI connects satellite oil-spill screening, drift hypotheses and historical vessel evidence in one analyst workflow. A geospatial backend processes SAR imagery, tests possible release windows and ranks investigative vessel leads. A new Response Brief provides observation details, available estimates and missing-evidence checks in a copyable, downloadable handoff. The public prototype demonstrates the workflow with labelled synthetic results, live catalogue previews and real-SAR test examples. It is decision support, not proof of pollution or vessel responsibility; arbitrary-image inference requires the Python backend, and forecast accuracy remains to be validated.
+CodeCracker Dragons connects satellite oil-spill screening, drift hypotheses and historical vessel evidence in one analyst workflow. A geospatial backend processes SAR imagery, tests possible release windows and ranks investigative vessel leads. A new Response Brief provides observation details, available estimates and missing-evidence checks in a copyable, downloadable handoff. The public prototype demonstrates the workflow with labelled synthetic results, live catalogue previews and real-SAR test examples. It is decision support, not proof of pollution or vessel responsibility; arbitrary-image inference requires the Python backend, and forecast accuracy remains to be validated.
 
 ## Feature text for the PPT
 
@@ -51,7 +53,7 @@ Response Brief — converts the selected spill candidate, observation time, drif
 
 “A suspected slick is only the start of an investigation. An officer needs to know when it was observed, where it might have come from and which vessel tracks deserve review.
 
-This is OSI. I am running our labelled synthetic scenario to demonstrate the complete workflow. The image, drift model and vessel results in this scenario are not a live pollution incident.
+We are CodeCracker Dragons. I am running our labelled synthetic scenario to demonstrate the complete workflow. The image, drift model and vessel results in this scenario are not a live pollution incident.
 
 The system brings the candidate area, possible release window and vessel evidence together. This vessel ranks first on evidence match; the score is not a probability of guilt. Here we can see a gap in its AIS record.
 

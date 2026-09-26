@@ -11,6 +11,7 @@ PUBLIC = ROOT / "public-demo"
 
 def main() -> None:
     html = (PUBLIC / "index.html").read_text(encoding="utf-8")
+    assert "<title>CodeCracker Dragons | Oil-spill monitoring</title>" in html, "public branding is stale"
     app = (PUBLIC / "app.js").read_text(encoding="utf-8")
     live_api = (PUBLIC / "api" / "live-scenes.js").read_text(encoding="utf-8")
     required_ids = {

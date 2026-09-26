@@ -1,12 +1,12 @@
-# OSI — Oil Spill Intelligence (SIH26143 · NTRO)
+# CodeCracker Dragons — Oil-spill monitoring (SIH26143 · NTRO)
 
 Continuous Sentinel-1 catalogue watch → every new AOI image → multiple-slick segmentation → cross-pass incident grouping → drift → configured AIS matching → explainable alerts.
 
 The monitor deduplicates catalogue product IDs, processes every new AOI acquisition, retains multiple slicks from one image and links repeat-pass detections into incidents. A one-image upload remains available for ad-hoc review. See `docs/CONTINUOUS_MONITORING.md`.
 
-**Public SIH judge demo:** https://public-demo-one.vercel.app — read-only bundled synthetic case. The full FastAPI build below enables real uploads/connectors and must be secured before operational deployment.
+**Public SIH judge demo:** https://codecracker-dragons.vercel.app — read-only bundled synthetic case. The previous https://public-demo-one.vercel.app address remains available. The full FastAPI build below enables real uploads/connectors and must be secured before operational deployment.
 
-**Technical documentation:** https://public-demo-one.vercel.app/technical-documentation — current capabilities, data sources, evaluation, limitations and a testing guide. The Home view now includes a copyable/downloadable **Response brief** built from the selected detection's results. Submission wording and a recording checklist are in `docs/SUBMISSION_READY.md`.
+**Technical documentation:** https://codecracker-dragons.vercel.app/technical-documentation — current capabilities, data sources, evaluation, limitations and a testing guide. The Home view now includes a copyable/downloadable **Response brief** built from the selected detection's results. Submission wording and a recording checklist are in `docs/SUBMISSION_READY.md`.
 
 The judge link is a static, deterministic replay, so it does not depend on a sleeping backend. Select **Arabian Sea synthetic replay** or **Run historical replay**, then pause, restart or change speed while the six processing stages appear. Map controls independently show SAR, a visual-only contrast preview, the suspected slick, modelled drift and historical AIS. Observed, processed and modelled products are labelled separately; vessel ranking is an investigation lead, not proof of responsibility.
 

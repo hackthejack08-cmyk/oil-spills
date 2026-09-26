@@ -46,10 +46,12 @@ h4 { margin: 0 0 7px; font-size: 13px; }
 .brand {
   padding: 0 10px 19px;
   border-bottom: 1px solid #34444c;
-  font-size: 27px;
+  font-size: 20px;
   font-weight: 700;
-  letter-spacing: -.8px;
+  line-height: 1.25;
+  letter-spacing: -.4px;
 }
+.brand > span { display: block; }
 .brand small {
   display: block;
   margin-top: 1px;
@@ -482,7 +484,7 @@ progress { max-width: 100%; accent-color: var(--accent); }
 .public-demo .stage-strip { grid-template-columns: 135px minmax(0, 1fr); }
 @media (max-width: 1100px) {
   .rail { width: 142px; flex-basis: 142px; padding-inline: 7px; }
-  .brand { font-size: 25px; }
+  .brand { font-size: 18px; }
   .workspace-head { padding-inline: 14px; }
   .operational-meta span:nth-child(2) { display: none; }
   .stage-strip { grid-template-columns: 110px minmax(0, 1fr); }
@@ -495,6 +497,7 @@ progress { max-width: 100%; accent-color: var(--accent); }
   body { display: block; height: auto; }
   .rail { width: 100%; padding: 9px 10px; display: block; }
   .brand { display: inline-block; padding: 0 8px 7px; border: 0; font-size: 21px; }
+  .brand > span { display: inline; }
   .brand small, .rail-foot { display: none; }
   nav { flex-direction: row; overflow-x: auto; padding-top: 3px; border-top: 1px solid #34444c; }
   nav button { width: auto; flex-shrink: 0; padding: 7px 10px; border-left: 0; border-bottom: 2px solid transparent; }

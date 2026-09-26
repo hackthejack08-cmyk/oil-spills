@@ -9,6 +9,7 @@ const detections = data.scene.detections.filter(d => d.oil_likelihood >= 0.5);
 const state = { inv: data.investigation, scene: data.scene, detection: detections.find(d => d.id === data.drift.detection_id), drift: data.drift, ais: data.ais };
 const options = { detections, now: Date.parse("2026-09-25T18:00:00.123Z"), publicDemo: true };
 const brief = buildResponseBrief(state, options);
+assert.match(brief.text, /^CODECRACKER DRAGONS — RESPONSE BRIEF/);
 assert.match(brief.text, /Prepared: 2026-09-25 18:00:00 UTC/);
 assert.match(brief.basis, /synthetic/);
 assert.match(brief.text, /1 candidate for review.*14\.20 km²/);

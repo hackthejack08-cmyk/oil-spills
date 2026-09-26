@@ -64,7 +64,7 @@ function buildResponseBrief(state, { detections = state.scene?.detections || [],
   const sources = [...new Set([scene.metadata?.source || scene.source_label || "Image metadata", env.wind_source || forcing.wind_source,
     env.current_source || forcing.current_source, forcing.title].filter(Boolean).map(line))].join("; ");
   const reference = `${line(state.inv?.id)} / ${line(scene.scene_id || state.inv?.id)} / ${det ? line(det.id) : "no selected detection"}`;
-  const text = ["OSI RESPONSE BRIEF", basis, `Prepared: ${utc(now)}`, `Case / scene / detection: ${reference}`, "",
+  const text = ["CODECRACKER DRAGONS — RESPONSE BRIEF", basis, `Prepared: ${utc(now)}`, `Case / scene / detection: ${reference}`, "",
     ...rows.map(([label, value]) => `${label}: ${value}`), "", "CHECK BEFORE HANDOFF",
     ...checks.map((check) => `- ${check}`), "", `Sources: ${sources}`,
     "Analyst review required. Vessel scores indicate investigation leads; they do not establish responsibility."].join("\n");
