@@ -6,6 +6,8 @@ The monitor deduplicates catalogue product IDs, processes every new AOI acquisit
 
 **Public SIH judge demo:** https://public-demo-one.vercel.app — read-only bundled synthetic case. The full FastAPI build below enables real uploads/connectors and must be secured before operational deployment.
 
+**Technical documentation:** https://public-demo-one.vercel.app/technical-documentation — current capabilities, data sources, evaluation, limitations and a testing guide. The Home view now includes a copyable/downloadable **Response brief** built from the selected detection's results. Submission wording and a recording checklist are in `docs/SUBMISSION_READY.md`.
+
 The judge link is a static, deterministic replay, so it does not depend on a sleeping backend. Select **Arabian Sea synthetic replay** or **Run historical replay**, then pause, restart or change speed while the six processing stages appear. Map controls independently show SAR, a visual-only contrast preview, the suspected slick, modelled drift and historical AIS. Observed, processed and modelled products are labelled separately; vessel ranking is an investigation lead, not proof of responsibility.
 
 ```bash

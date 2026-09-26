@@ -234,6 +234,7 @@ async function analyzeScene() {
     if (window.OSI_PUBLIC_DEMO) {
       let scene;
       if (S.inv?.mode === "sar-reception") {
+        if (S.inv.id !== REAL_SAR_SAMPLE.id) throw new Error("This live-catalogue image has no published analysis. Use the full analysis service; the archived 2019 result belongs to a different image.");
         const response = await fetch("samples/S1A_IW_20190616_140738_analysis.json");
         if (!response.ok) throw new Error("The published SAR analysis result could not be loaded.");
         scene = await response.json();
@@ -480,8 +481,36 @@ function resetResults() {
   layers.slick.clearLayers();
   $("#sceneInfo").replaceChildren(); $("#detList").replaceChildren();
   $("#contextPanel").hidden = true; $("#contextPanel").replaceChildren();
+  renderResponseBrief();
   S.timeline = []; $("#timeline").replaceChildren();
 }
+function currentResponseBrief() {
+  return buildResponseBrief(S, { detections: reviewDetections(S.scene), publicDemo: Boolean(window.OSI_PUBLIC_DEMO) });
+}
+function renderResponseBrief() {
+  const brief = currentResponseBrief();
+  $("#responseBrief").hidden = !brief;
+  $("#briefText").value = brief?.text || "";
+  if (!brief) return;
+  $("#briefBasis").textContent = brief.basis;
+  $("#briefFacts").innerHTML = brief.rows.map(([label, value]) => `<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`).join("");
+  $("#briefChecks").innerHTML = brief.checks.map((check) => `<li>${esc(check)}</li>`).join("");
+}
+$("#btnCopyBrief").onclick = async () => {
+  renderResponseBrief();
+  try { await navigator.clipboard.writeText($("#briefText").value); notify("Response brief copied. Ready for analyst handoff."); }
+  catch { $("#briefText").parentElement.open = true; $("#briefText").focus(); $("#briefText").select(); notify("Select and copy the brief text below."); }
+};
+$("#btnDownloadBrief").onclick = () => {
+  const brief = currentResponseBrief();
+  if (!brief) return;
+  const url = URL.createObjectURL(new Blob([brief.text], { type: "text/plain;charset=utf-8" }));
+  const link = document.createElement("a"); link.href = url;
+  link.download = `${String(S.inv?.id || "scene").replace(/[^a-zA-Z0-9_-]/g, "_")}-response-brief.txt`;
+  document.body.appendChild(link); link.click(); link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  notify("Response brief downloaded as text. Evidence JSON remains available separately.");
+};
 function renderCandidates() {
   const candidates = S.ais?.candidates || [];
   $("#candidateOverview").innerHTML = candidates.length ? `<table><thead><tr><th>Vessel</th><th>Evidence match</th><th>Nearest to origin</th><th>Missing tracking</th></tr></thead><tbody>${candidates.map((c) => {
@@ -494,7 +523,7 @@ function kpis() {
   const h = dr && dr.backward.hypotheses[3];
   $("#kpis").innerHTML = S.inv ? [
     ["Scenes scanned", S.scene ? "1" : "0"], ["Latest scene", S.scene ? (S.scene.sensing_time || "").slice(0, 16) : "–"],
-    ["Slicks detected", S.scene ? String(S.scene.detections?.length || 0) : "–"],
+    ["Possible spills", S.scene ? String(reviewDetections(S.scene).length) : "–"],
     ["Oil-likelihood score (uncalibrated)", d ? fmt(d.oil_likelihood) : "–"], ["Area", d ? fmt(d.geometry.area_km2, 2) + " km²" : "–"],
     ["Centroid", d ? `${fmt(d.geometry.centroid_lat, 3)}, ${fmt(d.geometry.centroid_lon, 3)}` : "–"],
     ["Origin (4 h hyp.)", h ? `${fmt(h.centre[1], 3)}, ${fmt(h.centre[0], 3)} ±${fmt(h.spread_km, 1)} km` : "–"],
@@ -525,6 +554,7 @@ function kpis() {
     '<b>Review required before action</b>'
   ].map((s) => `<span>${s}</span>`).join("") : "Choose an operation to begin.";
   renderCandidates();
+  renderResponseBrief();
 }
 
 async function applyCaseResult(r, message) {
@@ -663,7 +693,7 @@ function startRealReception() {
 async function revealReplayStage(id) {
   const r = replay.result;
   if (id === "acquisition") {
-    S.scene = { ...r.scene, detections: [] }; S.detection = null;
+    S.scene = { ...r.scene, detector: "not processed", detections: [] }; S.detection = null;
     renderScene(); replayTime("Observed SAR loaded"); log("observed SAR acquisition loaded from the synthetic judge case");
   } else if (id === "preprocessing") {
     replayTime("Processed SAR preview"); log("processed: georeferenced, clipped and speckle-filtered for analysis");

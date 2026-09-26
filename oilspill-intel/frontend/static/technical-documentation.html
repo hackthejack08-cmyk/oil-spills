@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="OSI technical documentation: implementation, data provenance, evaluation and a reproducible testing guide for SIH26143.">
+<title>OSI · Technical documentation</title>
+<style>
+:root{color-scheme:light;--ink:#16323e;--muted:#536771;--line:#d4dfe2;--accent:#137780}
+*{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:24px}body{margin:0;background:#f3f6f6;color:var(--ink);font:16px/1.65 system-ui,-apple-system,"Segoe UI",sans-serif}a{color:#086570;text-underline-offset:3px}a:hover{color:#003e47}a:focus-visible,button:focus-visible{outline:3px solid #c47710;outline-offset:4px}
+.top{background:#102c38;color:white;padding:16px max(24px,calc((100vw - 1100px)/2));display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center;justify-content:space-between}.top a{color:#d8eced}.top strong{letter-spacing:.08em}.layout{max-width:1150px;margin:0 auto;padding:36px 24px 60px;display:grid;grid-template-columns:200px minmax(0,1fr);gap:44px}nav{align-self:start;position:sticky;top:24px;font-size:14px}nav a{display:block;padding:5px 0;text-decoration:none}nav b{display:block;margin-bottom:12px}article{background:white;padding:36px 42px;border:1px solid var(--line)}.eyebrow,.meta{color:var(--muted);font-size:13px}.eyebrow{text-transform:uppercase;letter-spacing:.08em}h1{font-size:38px;line-height:1.15;letter-spacing:-.03em;margin:12px 0 16px}h2{font-size:25px;line-height:1.3;margin:0 0 18px}h3{font-size:18px;margin:22px 0 8px}p{margin:0 0 16px}.lead{font-size:19px;line-height:1.55}.note{border-left:3px solid var(--accent);background:#f0f7f7;padding:14px 18px}.caution{border-color:#9d701e;background:#fbf7ee}section{border-top:1px solid var(--line);margin-top:32px;padding-top:28px}ul,ol{padding-left:22px}li+li{margin-top:8px}.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:14px;margin:16px 0}th,td{padding:10px 12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}th{background:#eef4f4}code{font-size:.88em;overflow-wrap:anywhere}pre{background:#102c38;color:#edf5f6;padding:16px;overflow:auto;line-height:1.5}pre code{overflow-wrap:normal}.flow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding:0;list-style:none;counter-reset:step}.flow li{margin:0;border:1px solid var(--line);padding:12px;font-size:14px}.flow li:before{counter-increment:step;content:counter(step,decimal-leading-zero);display:block;color:var(--accent);font-weight:700}.small{font-size:14px;color:var(--muted)}button{border:1px solid var(--line);background:white;color:var(--ink);font:inherit;padding:8px 14px;cursor:pointer}footer{font-size:13px;color:var(--muted);margin-top:28px}
+@media(max-width:850px){.layout{grid-template-columns:1fr;gap:20px;padding:20px 12px}nav{position:static;display:flex;gap:8px 20px;flex-wrap:wrap}nav b{width:100%;margin:0}article{padding:24px}h1{font-size:32px}.flow{grid-template-columns:1fr}}
+@media print{body{background:white;font-size:11pt}.top,nav,.print{display:none}.layout{display:block;padding:0;max-width:none}article{border:0;padding:0}h1{font-size:28pt}h2{break-after:avoid}tr,.note,.flow li{break-inside:avoid}a{color:inherit}section{margin-top:20px;padding-top:18px}}
+</style>
+</head>
+<body>
+<header class="top"><strong>OSI / ENGINEERING NOTES</strong><div><a href="./" target="_blank" rel="noopener">Open application ↗</a> &nbsp; <a href="https://github.com/hackthejack08-cmyk/oil-spills/tree/main/oilspill-intel" target="_blank" rel="noopener">Source code ↗</a></div></header>
+<div class="layout">
+<nav aria-label="Document sections"><b>In this document</b><a href="#purpose">Problem &amp; scope</a><a href="#status">What works today</a><a href="#workflow">Processing workflow</a><a href="#data">Data &amp; inputs</a><a href="#brief">Response brief</a><a href="#evaluation">Measured results</a><a href="#testing">Testing guide</a><a href="#engineering">Run the backend</a><a href="#limits">Limits &amp; next steps</a><a href="#references">References</a></nav>
+<article>
+<div class="eyebrow">CodeCracker Dragons · SIH26143</div>
+<h1>Oil-spill intelligence,<br>from observation to review.</h1>
+<p class="lead">A suspected slick has appeared offshore. Where was it observed, where might it move, and which vessels need investigation?</p>
+<p>OSI brings radar imagery, drift estimates and historical vessel tracks into one investigation view. The response brief turns those results into a readable handoff for a Coast Guard, port or pollution-response officer.</p>
+<p class="meta">Technical documentation · 26 September 2026 · Prototype implementation</p>
+<p class="note">The public site combines live catalogue previews with a saved, labelled demonstration. It is not an operational surveillance service. A catalogue image is not automatically a detected oil spill.</p>
+<button class="print" type="button" onclick="window.print()">Print / save as PDF</button>
+
+<section id="purpose"><h2>1. Problem and scope</h2>
+<p>A dark feature on radar is only a starting point. An investigator must establish its location and observation time, consider look-alikes, reconstruct possible movement and inspect traffic near plausible release locations.</p>
+<p>The problem we address is the work needed to connect these steps and explain the result. OSI keeps scene identifiers, timing, candidate geometry, model assumptions and vessel evidence together. It does not establish legal responsibility or replace field confirmation.</p>
+<p>Satellite oil-spill monitoring, drift modelling and vessel correlation already exist. <a href="https://emsa.europa.eu/csn-menu.html">EMSA CleanSeaNet</a> combines these capabilities operationally. Our contribution is a small, inspectable implementation with multiple release-time hypotheses, visible evidence gaps and a handoff brief—not a claim to have invented the overall workflow.</p></section>
+
+<section id="status"><h2>2. What works today</h2>
+<div class="table-wrap"><table><thead><tr><th scope="col">Capability</th><th scope="col">Public website</th><th scope="col">Python backend / remaining work</th></tr></thead><tbody>
+<tr><td>Satellite imagery</td><td>Queries Sentinel-1 catalogue metadata and previews; shows acquisition time. An archived measured SAR sample is also bundled.</td><td>Connectors retrieve and calibrate radar pixels for a configured area.</td></tr>
+<tr><td>Oil-slick screening</td><td>Replays saved baseline outputs for supported samples. It does not run new Python inference in the browser.</td><td>Adaptive local-contrast screening and look-alike rules. A U-Net loading path exists; no trained checkpoint is shipped.</td></tr>
+<tr><td>Image upload</td><td>The designated synthetic TIFF is recognised and its saved result replayed. Arbitrary files or URLs require the backend.</td><td>GeoTIFF upload and public HTTPS URL endpoints. Missing georeferencing or acquisition time can prevent a complete run.</td></tr>
+<tr><td>Wind, drift and AIS</td><td>Available as saved synthetic scenario results, explicitly labelled.</td><td>Automatic environmental-data connectors and historical AIS matching, subject to coverage and credentials. Forecast accuracy is not yet measured.</td></tr>
+<tr><td>Optical imagery</td><td>Time/cloud-ranked Sentinel-2 previews and daily NASA GIBS/VIIRS context.</td><td>Manual context only. Automated SAR–EO oil confirmation is not implemented.</td></tr>
+<tr><td>Continuous monitoring</td><td>Catalogue refresh while the page is open; the displayed full processing cycle is a replay.</td><td>A scan-job endpoint deduplicates products and groups detections. Always-on hosting and scheduling are still required.</td></tr>
+<tr><td>Handoff and evidence</td><td>Copy/download the response brief; inspect and download evidence JSON; download labelled test images.</td><td>The backend records inputs, outputs, parameters and SHA-256 evidence hashes.</td></tr>
+</tbody></table></div>
+<p class="small">Public catalogue refresh is currently five minutes while the page is open. Refresh frequency is not satellite revisit frequency, and catalogue availability is not guaranteed.</p></section>
+
+<section id="workflow"><h2>3. Processing workflow</h2>
+<ol class="flow"><li>Locate the scene<br><small>Area, acquisition time, source ID</small></li><li>Screen the radar image<br><small>Candidate polygons and look-alike checks</small></li><li>Retrieve environment<br><small>Time-matched wind and currents</small></li><li>Estimate drift<br><small>Possible origins and future movement</small></li><li>Compare vessel tracks<br><small>Evidence-ranked investigation leads</small></li><li>Review and hand off<br><small>Response brief and evidence record</small></li></ol>
+<h3>Radar screening</h3><p>The baseline smooths SAR backscatter, compares each pixel with its local background and applies a contrast-based score. Morphological filtering joins neighbouring pixels; connected regions become candidate slicks. Geometry and look-alike checks assess contrast, shape and coastal context. A dark patch can also be calm water, wind shadow or another non-oil feature.</p>
+<h3>GIS: putting the evidence in the same place</h3><p>GIS means Geographic Information System. Here it connects the raster's coordinate reference system with slick polygons, current grids and AIS tracks. Rasterio reads georeferenced images; PyProj handles coordinate transformations; Shapely supports geometry operations; Leaflet displays the map. Distances and areas must be calculated with geographic coordinates accounted for, not from screen pixels.</p>
+<h3>Drift and release hypotheses</h3><p>The built-in surface-particle model combines currents, a wind-driven component and stochastic spreading. Backward runs test several possible release ages; forward runs estimate movement from the observation. The output is a collection of possible positions and a time window. It is not a measured release instant. OpenDrift is an optional adapter, not the engine used by the saved baseline demonstration.</p>
+<h3>Vessel evidence</h3><p>Historical AIS tracks are compared with the origin hypotheses using spatial proximity, timing, track orientation, behaviour and data quality. Weighted rules produce a ranking. Gaps and inferred positions remain visible. A score of 75/100 means an uncalibrated evidence-match score—not 75% accuracy or a 75% probability that the vessel caused pollution.</p>
+<h3>Replay versus reception</h3><p>The measured example was acquired on 16 June 2019, from 14:07:38 to 14:08:03 UTC. Its 25-second animation illustrates a product acquisition interval; it is not a recording of satellite downlink. Replay speed changes presentation timing only. Display enhancement does not add measured resolution and does not replace the detector's input with AI-upscaled pixels.</p></section>
+
+<section id="data"><h2>4. Data and required inputs</h2>
+<div class="table-wrap"><table><thead><tr><th scope="col">Input</th><th scope="col">Source / format</th><th scope="col">Constraint</th></tr></thead><tbody>
+<tr><td>SAR</td><td>Copernicus Sentinel-1 GRD via Microsoft Planetary Computer; georeferenced GeoTIFF and product metadata.</td><td>A PNG screenshot or arbitrary internet image may lack calibrated pixels, coordinates or acquisition time.</td></tr>
+<tr><td>Optical context</td><td>Sentinel-2 L2A; NASA GIBS NOAA-21 VIIRS true-colour imagery.</td><td>Cloud, resolution and time gaps limit corroboration. NASA imagery here is optical context, not SAR.</td></tr>
+<tr><td>Environment</td><td>Backend connectors for HYCOM currents and Open-Meteo wind; optional Copernicus Marine source.</td><td>Must cover the scene and model time window. Unavailable data must not be silently presented as measured.</td></tr>
+<tr><td>Vessel tracks</td><td>Historical AIS CSV/provider records. MarineCadastre provides US-region historical examples.</td><td>US data do not provide Indian-water coverage. The target deployment needs authorised regional records.</td></tr>
+<tr><td>Evaluation labels</td><td>GlobalOSD-SAR centre points and acquisition dates, CC BY 4.0.</td><td>Point labels support screening checks, not pixel-mask segmentation IoU or confirmed polluter attribution.</td></tr>
+</tbody></table></div>
+<p>Minimum useful SAR input: a valid coordinate reference system and geotransform, acquisition timestamp, known band/polarisation and backscatter interpretation. A complete drift/AIS run also needs environmental coverage and historical vessel records for the relevant area and period.</p>
+<p>The public catalogue query currently covers the Mumbai coast, 72.2–73.0° E and 18.6–19.5° N. This is a configured demonstration area, not a limitation of satellite physics. The separate synthetic scenario and archived measured sample are labelled with their own coordinates and dates.</p></section>
+
+<section id="brief"><h2>5. Response brief: the user-facing addition</h2>
+<p>An officer should not have to assemble a handoff from several technical panels. After results arrive, the Home view shows the observation time and location, selected candidate area, possible release window, movement estimate and highest-ranked vessel lead.</p>
+<p><strong>Copy brief</strong> and <strong>Download brief</strong> produce the same plain-text summary. Checks include missing drift or AIS results, expired forecast periods, uncertain AIS positions and synthetic-data warnings. Changing the selected detection cannot pull in another detection's drift or vessel results.</p>
+<p>The brief does not calculate coastal arrival time, choose a response vessel or dispatch an alert. Those decisions need validated forecasts, exposure data and agency procedures. This feature addresses a practical handoff need; it has not yet been evaluated with operational users.</p></section>
+
+<section id="evaluation"><h2>6. Measured results</h2>
+<p>The packaged diverse baseline run contains 19 usable scenes: 10 oil-positive and 9 look-alike examples. One requested negative had no matching indexed scene and was excluded. A hit requires a candidate score of at least 0.50 within 8 km of the labelled point.</p>
+<div class="table-wrap"><table><thead><tr><th scope="col">Measure</th><th scope="col">Result</th><th scope="col">Meaning</th></tr></thead><tbody>
+<tr><td>Recall</td><td>8/10 = 80.0%</td><td>Two positive cases were missed.</td></tr>
+<tr><td>Negative false-alarm rate</td><td>4/9 = 44.4%</td><td>Four look-alikes generated a positive result.</td></tr>
+<tr><td>Precision</td><td>8/12 = 66.7%</td><td>Share of positive predictions that matched positive labels in this test.</td></tr>
+<tr><td>Scene-level accuracy</td><td>13/19 = 68.4%</td><td>Eight true positives and five true negatives; not pixel accuracy.</td></tr>
+</tbody></table></div>
+<p class="note caution">The false-alarm rate is too high to treat the baseline as an unattended operational detector. These are small-sample screening results, not a deployment-wide accuracy claim. Forecast error, calibrated uncertainty and vessel-attribution accuracy remain unmeasured.</p>
+<p>The ten-image download is a <em>subset for inspection</em>, with five positive and five negative chips. It is not the full 19-scene denominator above. Its manifest includes expected labels and baseline outcomes, including mistakes.</p>
+<p><a href="samples/OSI_judge_validation_pack.zip" download>Download labelled real-SAR test pack (10 GeoTIFFs)</a> · <a href="https://github.com/hackthejack08-cmyk/oil-spills/blob/main/oilspill-intel/demo/samples/globalosd_diverse20/benchmark_summary.json">Saved benchmark summary</a> · <a href="https://github.com/hackthejack08-cmyk/oil-spills/blob/main/oilspill-intel/docs/EVALUATION.md">Evaluation method and earlier runs</a></p></section>
+
+<section id="testing"><h2>7. Testing the public build</h2>
+<ol>
+<li>Open the application and select <strong>Scan for oil spills</strong>. The data badge must say <strong>Demo data</strong>. This runs the saved synthetic workflow.</li>
+<li>Wait for all stages to finish. In the current sample, one candidate passes the public review filter, its area is 14.20 km² and SYN-TANKER-ALPHA is the highest-ranked lead at 75/100. These are reproducibility checks, not real incident claims.</li>
+<li>On <strong>Home</strong>, read the <strong>Response brief</strong>. Expand <strong>Checks before handoff</strong>. Verify that the synthetic warning and 39-minute AIS-gap limitation are present. Copy the brief and download its text file.</li>
+<li>Open <strong>Evidence</strong>, inspect the record and use <strong>Download report</strong> for JSON. A SHA-256 hash helps detect changes to a record; it does not prove the scientific result or give legal certification.</li>
+<li>Open <strong>Accuracy</strong> and download the labelled test pack. Check positive and negative examples against its manifest. Running fresh detection on these arbitrary TIFFs requires the local backend.</li>
+<li>Select <strong>View latest real radar image</strong>. Check its source, coordinates and acquisition time. A preview must say analysis is pending and must not retain the synthetic case's vessel ranking. If the live catalogue is unavailable, the bundled 2019 measured scene is used and must remain labelled historical.</li>
+<li>For upload replay, download <strong>Download test image</strong> from Home and select that exact file. Other images must report the public-build limitation instead of borrowing its detection result.</li>
+</ol>
+<p class="small">Before recording a demonstration, test the public link in a signed-out browser. Keep catalogue connectivity and a recorded scenario separate in your narration. Record only results you can reproduce.</p></section>
+
+<section id="engineering"><h2>8. Engineering and local execution</h2>
+<p>The interface is HTML, CSS and JavaScript with Leaflet. The public deployment serves static assets plus a catalogue-preview endpoint. The analysis service is Python/FastAPI with Pydantic validation. Rasterio, NumPy/SciPy, PyProj, Shapely and xarray support raster, geometry and environmental processing. SQLite stores the prototype's records; geometries use GeoJSON. PostGIS is an upgrade option, not the current database.</p>
+<p>From the repository's <code>oilspill-intel</code> directory:</p>
+<pre><code>python app.py
+# Opens the local service at http://localhost:8000
+
+node tools/check_response_brief.cjs
+python tools/check_public_demo.py
+cd backend
+..\.venv\Scripts\python.exe -m pytest tests -q</code></pre>
+<p class="small">The pytest command above is for Windows; on Linux/macOS use <code>../.venv/bin/python -m pytest tests -q</code> from <code>backend</code>. Run tests there so Python imports the backend package rather than the root launcher. The launcher can install dependencies; real-data runs also need network access and appropriate source credentials. See the <a href="https://github.com/hackthejack08-cmyk/oil-spills/blob/main/oilspill-intel/docs/INSTALL.md">installation guide</a>. Never publish credentials in a presentation, repository or browser bundle.</p>
+<div class="table-wrap"><table><thead><tr><th scope="col">Backend endpoint</th><th scope="col">Purpose</th></tr></thead><tbody>
+<tr><td><code>POST /api/auto/run</code></td><td>Upload and queue a GeoTIFF investigation.</td></tr>
+<tr><td><code>POST /api/auto/url</code></td><td>Queue a supported public HTTPS GeoTIFF URL.</td></tr>
+<tr><td><code>POST /api/data/monitor/scan</code></td><td>Process newly discovered products for an area.</td></tr>
+<tr><td><code>POST /api/drift/hindcast</code><br><code>POST /api/drift/forecast</code></td><td>Run drift for a candidate and environmental dataset.</td></tr>
+<tr><td><code>POST /api/ais/analyze</code></td><td>Clean and correlate historical vessel records.</td></tr>
+<tr><td><code>GET /api/evidence/{inv_id}/export</code></td><td>Export the investigation evidence as JSON.</td></tr>
+</tbody></table></div>
+<p>These analysis endpoints belong to the local/full service, not the static public site. Its automatic scan jobs need a scheduler and an always-running host to continue when the browser is closed.</p></section>
+
+<section id="limits"><h2>9. Limits and the next validation steps</h2>
+<ul><li><strong>Reduce false alerts:</strong> evaluate on a larger incident-separated set with wind shadows, calm water, coastal features and other hard negatives. Train and test any learned model on separate incidents; report misses as well as hits.</li>
+<li><strong>Validate drift:</strong> compare forecasts with later observed slick positions or suitable drifter records. Report position error by forecast horizon and how often observations fall inside the predicted region. Synthetic agreement is not enough.</li>
+<li><strong>Check attribution:</strong> use authorised historical AIS and independently documented incidents. Sparse, switched-off or incorrect AIS can prevent identification.</li>
+<li><strong>Handle different observations:</strong> EO may be cloudy, delayed or too coarse. A single SAR scene does not reveal a unique spill age. Missing metadata must produce a partial result, not invented inputs.</li>
+<li><strong>Prepare deployment:</strong> add access control, upload limits, retention rules, service health monitoring and a persistent job scheduler before operational use. No continuous-service uptime guarantee is made for this prototype.</li></ul>
+</section>
+
+<section id="references"><h2>10. References and implementation trail</h2>
+<ul><li><a href="https://emsa.europa.eu/csn-menu.html">EMSA CleanSeaNet</a> — existing oil-spill monitoring, analyst review, drift and vessel context.</li>
+<li><a href="https://planetarycomputer.microsoft.com/dataset/sentinel-1-grd">Microsoft Planetary Computer: Sentinel-1 GRD</a> — catalogue and pixel-access source used by the project.</li>
+<li><a href="https://nasa-gibs.github.io/gibs-api-docs/access-basics/">NASA GIBS API documentation</a> — public WMS/WMTS imagery services; used here for optical context.</li>
+<li><a href="https://doi.org/10.5281/zenodo.15286918">GlobalOSD-SAR dataset</a> and <a href="https://spj.science.org/doi/10.34133/remotesensing.0613">associated research paper</a> — research labels used for screening evaluation.</li>
+<li><a href="https://github.com/hackthejack08-cmyk/oil-spills/tree/main/oilspill-intel/backend/app">Backend implementation</a> — <code>sar/segment.py</code>, <code>sar/lookalike.py</code>, <code>drift/engine.py</code>, <code>ais/correlate.py</code>, <code>monitoring.py</code> and <code>db.py</code>.</li>
+<li><a href="https://github.com/hackthejack08-cmyk/oil-spills/blob/main/oilspill-intel/frontend/static/response-brief.js">Response brief implementation</a> and <a href="https://github.com/hackthejack08-cmyk/oil-spills/blob/main/oilspill-intel/tools/check_response_brief.cjs">its regression check</a>.</li></ul>
+</section>
+<footer>CodeCracker Dragons · SIH26143 · Decision support for analyst review. No claim of confirmed pollution, vessel responsibility or operational forecast accuracy.</footer>
+</article></div>
+</body></html>

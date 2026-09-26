@@ -1,6 +1,7 @@
 """Fast, dependency-free checks for the static SIH judge build."""
 
 from pathlib import Path
+from html.parser import HTMLParser
 import zipfile
 
 
@@ -18,6 +19,7 @@ def main() -> None:
         "acquisitionProgress", "chkEnhanced", "chkSlick",
         "chkDriftLayers", "chkAisLayers", "btnExport",
         "liveFeed", "liveScenePreview", "liveOpticalPreview", "liveNasaPreview", "liveArchive", "liveOptical", "liveNasa",
+        "responseBrief", "briefFacts", "briefChecks", "briefText", "btnCopyBrief", "btnDownloadBrief",
     }
     missing = sorted(element_id for element_id in required_ids if f'id="{element_id}"' not in html)
     assert not missing, f"missing public controls: {', '.join(missing)}"
@@ -49,6 +51,29 @@ def main() -> None:
     assert 'href="samples/OSI_judge_validation_pack.zip"' in html, "validation pack download is not linked"
     assert (ROOT / "frontend" / "static" / "app.js").read_bytes() == (PUBLIC / "app.js").read_bytes(), "public app.js is stale"
     assert (ROOT / "frontend" / "static" / "app.css").read_bytes() == (PUBLIC / "app.css").read_bytes(), "public app.css is stale"
+    assert '<script src="response-brief.js"></script>' in html, "response brief helper is not loaded"
+    assert (ROOT / "frontend" / "static" / "response-brief.js").read_bytes() == (PUBLIC / "response-brief.js").read_bytes(), "public response brief is stale"
+    assert 'S.inv.id !== REAL_SAR_SAMPLE.id' in app, "historical analysis must not be attached to a different live scene"
+    document_path = PUBLIC / "technical-documentation.html"
+    assert 'href="technical-documentation.html"' in html, "technical documentation is not linked"
+    assert document_path.read_bytes() == (ROOT / "frontend" / "static" / document_path.name).read_bytes(), "public documentation is stale"
+    class Links(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.ids, self.hrefs = set(), []
+        def handle_starttag(self, tag, attrs):
+            attrs = dict(attrs)
+            if "id" in attrs:
+                self.ids.add(attrs["id"])
+            if tag == "a":
+                self.hrefs.append(attrs.get("href", ""))
+    document = Links()
+    document.feed(document_path.read_text(encoding="utf-8"))
+    for href in document.hrefs:
+        if href.startswith("#"):
+            assert href[1:] in document.ids, f"broken document section: {href}"
+        elif ":" not in href:
+            assert (PUBLIC / href).exists(), f"missing documentation download: {href}"
     print("Public demo check passed: controls, evaluation pack, assets, and source sync are valid.")
 
 

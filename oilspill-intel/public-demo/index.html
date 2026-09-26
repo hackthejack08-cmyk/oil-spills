@@ -22,7 +22,7 @@
     <button data-page="evaluation">Accuracy</button>
     <button data-page="data">Data setup</button>
   </nav>
-  <div class="rail-foot"><div class="status" id="health" role="status">Connecting…</div></div>
+  <div class="rail-foot"><a class="documentation-link" href="technical-documentation.html" target="_blank" rel="noopener">Technical documentation ↗</a><div class="status" id="health" role="status">Connecting…</div></div>
 </header>
 <div class="workspace">
 <div class="workspace-head">
@@ -57,6 +57,14 @@
   <aside id="sidebar" tabindex="-1" aria-label="Investigation controls and evidence">
     <section id="page-dashboard" class="page active">
       <div class="operation-head"><span>Oil-spill monitor</span><b id="operationState">Ready</b></div>
+      <section id="responseBrief" class="response-brief" aria-labelledby="responseBriefTitle" hidden>
+        <h3 id="responseBriefTitle">Response brief</h3>
+        <p id="briefBasis" class="brief-basis"></p>
+        <dl id="briefFacts"></dl>
+        <details><summary>Checks before handoff</summary><ul id="briefChecks"></ul></details>
+        <div class="brief-actions"><button id="btnCopyBrief" class="secondary">Copy brief</button><button id="btnDownloadBrief" class="primary">Download brief</button></div>
+        <details><summary>Read / select brief text</summary><textarea id="briefText" rows="9" readonly aria-label="Response brief text"></textarea></details>
+      </section>
       <div class="image-workflow upload-card">
         <h3>Upload SAR GeoTIFF</h3>
         <label>Select a georeferenced .tif or .tiff file<input type="file" id="autoSceneFile" accept=".tif,.tiff"></label>
@@ -247,6 +255,7 @@
 </div>
 <script src="vendor/leaflet.js"></script>
 <script>window.OSI_PUBLIC_DEMO=true;</script>
+<script src="response-brief.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
